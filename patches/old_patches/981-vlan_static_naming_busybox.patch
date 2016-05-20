@@ -1,0 +1,22 @@
+--- a/networking/vconfig.c
++++ b/networking/vconfig.c
+@@ -39,6 +39,7 @@ enum vlan_name_types {
+ 	VLAN_NAME_TYPE_RAW_PLUS_VID, /* name will look like:  eth1.0005 */
+ 	VLAN_NAME_TYPE_PLUS_VID_NO_PAD, /* Name will look like:  vlan5 */
+ 	VLAN_NAME_TYPE_RAW_PLUS_VID_NO_PAD, /* Name will look like:  eth0.5 */
++	VLAN_NAME_TYPE_STATIC, /* Name will look like:  eth0 */
+ 	VLAN_NAME_TYPE_HIGHEST
+ };
+ 
+@@ -96,8 +97,10 @@ static const char name_types[] ALIGN1 =
+ 	'V','L','A','N','_','P','L','U','S','_','V','I','D','_','N','O','_','P','A','D',0,
+ 	VLAN_NAME_TYPE_RAW_PLUS_VID, 15,
+ 	'D','E','V','_','P','L','U','S','_','V','I','D',0,
+-	VLAN_NAME_TYPE_RAW_PLUS_VID_NO_PAD, 0,
++	VLAN_NAME_TYPE_RAW_PLUS_VID_NO_PAD, 21,
+ 	'D','E','V','_','P','L','U','S','_','V','I','D','_','N','O','_','P','A','D',0,
++	VLAN_NAME_TYPE_STATIC, 0,
++	'S','T','A','T','I','C',0,
+ };
+ 
+ int vconfig_main(int argc, char **argv) MAIN_EXTERNALLY_VISIBLE;

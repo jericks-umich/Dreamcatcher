@@ -1,0 +1,108 @@
+--- a/src/ap/ap_config.h
++++ b/src/ap/ap_config.h
+@@ -101,7 +101,8 @@ struct hostapd_ssid {
+ 	int dynamic_vlan;
+ #define DYNAMIC_VLAN_NAMING_WITHOUT_DEVICE 0
+ #define DYNAMIC_VLAN_NAMING_WITH_DEVICE 1
+-#define DYNAMIC_VLAN_NAMING_END 2
++#define DYNAMIC_VLAN_NAMING_STATIC_DEVICE 2
++#define DYNAMIC_VLAN_NAMING_END 3
+ 	int vlan_naming;
+ #ifdef CONFIG_FULL_DYNAMIC_VLAN
+ 	char *vlan_tagged_interface;
+--- a/src/ap/vlan_init.c
++++ b/src/ap/vlan_init.c
+@@ -639,9 +639,14 @@ static void vlan_newlink(char *ifname, s
+ 			vlan->configured = 1;
+ 
+ 			if (hapd->conf->vlan_bridge[0]) {
+-				os_snprintf(br_name, sizeof(br_name), "%s%d",
+-					    hapd->conf->vlan_bridge,
+-					    vlan->vlan_id);
++				if (vlan_naming == DYNAMIC_VLAN_NAMING_STATIC_DEVICE) {
++					os_snprintf(br_name, sizeof(br_name), "%s",
++							hapd->conf->vlan_bridge);
++				} else {
++					os_snprintf(br_name, sizeof(br_name), "%s%d",
++								hapd->conf->vlan_bridge,
++								vlan->vlan_id);
++				}
+ 			} else if (tagged_interface) {
+ 				os_snprintf(br_name, sizeof(br_name),
+ 				            "br%s.%d", tagged_interface,
+@@ -658,16 +663,20 @@ static void vlan_newlink(char *ifname, s
+ 
+ 			if (tagged_interface) {
+ 				if (vlan_naming ==
+-				    DYNAMIC_VLAN_NAMING_WITH_DEVICE)
++				    DYNAMIC_VLAN_NAMING_WITH_DEVICE){
+ 					os_snprintf(vlan_ifname,
+ 						    sizeof(vlan_ifname),
+ 						    "%s.%d", tagged_interface,
+ 						    vlan->vlan_id);
+-				else
++				}
++				else if (vlan_naming == DYNAMIC_VLAN_NAMING_WITHOUT_DEVICE){
+ 					os_snprintf(vlan_ifname,
+ 						    sizeof(vlan_ifname),
+ 						    "vlan%d", vlan->vlan_id);
+-
++				}
++				else if (vlan_naming == DYNAMIC_VLAN_NAMING_STATIC_DEVICE) {
++					os_snprintf(vlan_ifname, sizeof(vlan_ifname), "%s", tagged_interface);
++				}
+ 				clean = 0;
+ 				ifconfig_up(tagged_interface);
+ 				if (!vlan_add(tagged_interface, vlan->vlan_id,
+@@ -728,15 +737,20 @@ static void vlan_dellink(char *ifname, s
+ 
+ 			if (tagged_interface) {
+ 				if (vlan_naming ==
+-				    DYNAMIC_VLAN_NAMING_WITH_DEVICE)
++				    DYNAMIC_VLAN_NAMING_WITH_DEVICE){
+ 					os_snprintf(vlan_ifname,
+ 						    sizeof(vlan_ifname),
+ 						    "%s.%d", tagged_interface,
+ 						    vlan->vlan_id);
+-				else
++				}
++				else if (vlan_naming == DYNAMIC_VLAN_NAMING_WITHOUT_DEVICE) {
+ 					os_snprintf(vlan_ifname,
+ 						    sizeof(vlan_ifname),
+ 						    "vlan%d", vlan->vlan_id);
++				}
++				else if (vlan_naming == DYNAMIC_VLAN_NAMING_STATIC_DEVICE) {
++					os_snprintf(vlan_ifname, sizeof(vlan_ifname), "%s", tagged_interface);
++				}
+ 
+ 				clean = dyn_iface_put(hapd, vlan_ifname);
+ 
+@@ -898,10 +912,24 @@ full_dynamic_vlan_init(struct hostapd_da
+ 		return NULL;
+ 
+ #ifndef CONFIG_VLAN_NETLINK
+-	vlan_set_name_type(hapd->conf->ssid.vlan_naming ==
+-			   DYNAMIC_VLAN_NAMING_WITH_DEVICE ?
+-			   VLAN_NAME_TYPE_RAW_PLUS_VID_NO_PAD :
+-			   VLAN_NAME_TYPE_PLUS_VID_NO_PAD);
++	switch (hapd->conf->ssid.vlan_naming) {
++		case DYNAMIC_VLAN_NAMING_WITH_DEVICE:
++			vlan_set_name_type(VLAN_NAME_TYPE_RAW_PLUS_VID_NO_PAD);
++			break;
++		case DYNAMIC_VLAN_NAMING_WITHOUT_DEVICE:
++			vlan_set_name_type(VLAN_NAME_TYPE_PLUS_VID_NO_PAD);
++			break;
++		case DYNAMIC_VLAN_NAMING_STATIC_DEVICE:
++			vlan_set_name_type(VLAN_NAME_TYPE_STATIC);
++			break;
++		default:
++			vlan_set_name_type(VLAN_NAME_TYPE_PLUS_VID_NO_PAD);
++			break;
++	}
++	//vlan_set_name_type(hapd->conf->ssid.vlan_naming ==
++	//		   DYNAMIC_VLAN_NAMING_WITH_DEVICE ?
++	//		   VLAN_NAME_TYPE_RAW_PLUS_VID_NO_PAD :
++	//		   VLAN_NAME_TYPE_PLUS_VID_NO_PAD);
+ #endif /* CONFIG_VLAN_NETLINK */
+ 
+ 	priv->s = socket(PF_NETLINK, SOCK_RAW, NETLINK_ROUTE);

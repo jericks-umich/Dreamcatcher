@@ -1,0 +1,17 @@
+    DH Parameters: (1024 bit)
+        prime:
+            00:a3:4d:7c:fb:16:9b:b9:8e:d5:fd:2c:0d:6b:e4:
+            f5:b7:5f:cb:c5:eb:2c:ae:2a:43:50:d7:47:94:fa:
+            25:d3:33:20:20:37:95:a4:e0:fb:3a:e3:21:b6:40:
+            87:20:d3:ef:ac:e4:41:03:95:90:a3:c4:bb:e5:4e:
+            b6:1d:57:89:94:a6:7f:58:58:1e:f5:7a:36:ce:05:
+            bd:92:7e:cd:91:55:8c:3c:f6:ce:72:49:36:26:49:
+            56:39:dc:95:a7:4c:f6:d6:fa:b6:c4:0f:b2:ab:64:
+            19:60:34:bf:d5:3e:7e:14:3a:24:46:c7:9d:14:8d:
+            dc:80:4f:fa:c8:35:dc:70:07
+        generator: 5 (0x5)
+-----BEGIN DH PARAMETERS-----
+MIGHAoGBAKNNfPsWm7mO1f0sDWvk9bdfy8XrLK4qQ1DXR5T6JdMzICA3laTg+zrj
+IbZAhyDT76zkQQOVkKPEu+VOth1XiZSmf1hYHvV6Ns4FvZJ+zZFVjDz2znJJNiZJ
+VjncladM9tb6tsQPsqtkGWA0v9U+fhQ6JEbHnRSN3IBP+sg13HAHAgEF
+-----END DH PARAMETERS-----
