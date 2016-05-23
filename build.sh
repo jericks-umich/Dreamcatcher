@@ -2,7 +2,7 @@
 
 USAGE="Usage: $0 [-h] [-s] [-i]
 -h  print usage statement
--s  skip intro updates
+-s  skip intro updates (useful when rebuilding)
 -i  install required dependencies (apt-get based only)
 "
 
