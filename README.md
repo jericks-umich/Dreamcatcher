@@ -13,6 +13,7 @@ This link can be handy: [https://wiki.openwrt.org/toh/tp-link/tl-wdr4300](https:
 # Installation
 Simply run the build script. It will initialize the OpenWRT submodule, link
 the configuration files and patches into place, and run `make`.
+
     Usage: ./build.sh [-h] [-s] [-i]
     -h  print usage statement
     -s  skip intro updates (useful when rebuilding)
