@@ -1746,7 +1746,10 @@ CONFIG_PACKAGE_kmod-nls-base=y
 # Netfilter Extensions
 #
 # CONFIG_PACKAGE_kmod-arptables is not set
-# CONFIG_PACKAGE_kmod-ebtables is not set
+CONFIG_PACKAGE_kmod-ebtables=y
+CONFIG_PACKAGE_kmod-ebtables-ipv4=y
+# CONFIG_PACKAGE_kmod-ebtables-ipv6 is not set
+# CONFIG_PACKAGE_kmod-ebtables-watchers is not set
 CONFIG_PACKAGE_kmod-ip6tables=y
 # CONFIG_PACKAGE_kmod-ip6tables-extra is not set
 # CONFIG_PACKAGE_kmod-ipt-account is not set
@@ -1869,7 +1872,7 @@ CONFIG_PACKAGE_kmod-nfnetlink-queue=y
 # CONFIG_PACKAGE_kmod-ax25 is not set
 # CONFIG_PACKAGE_kmod-batman-adv is not set
 # CONFIG_PACKAGE_kmod-bonding is not set
-# CONFIG_PACKAGE_kmod-bridge is not set
+CONFIG_PACKAGE_kmod-bridge=y
 # CONFIG_PACKAGE_kmod-capi is not set
 # CONFIG_PACKAGE_kmod-dnsresolver is not set
 # CONFIG_PACKAGE_kmod-gre is not set
@@ -1882,7 +1885,7 @@ CONFIG_PACKAGE_kmod-nfnetlink-queue=y
 # CONFIG_PACKAGE_kmod-l2tp is not set
 # CONFIG_PACKAGE_kmod-l2tp-eth is not set
 # CONFIG_PACKAGE_kmod-l2tp-ip is not set
-# CONFIG_PACKAGE_kmod-llc is not set
+CONFIG_PACKAGE_kmod-llc=y
 # CONFIG_PACKAGE_kmod-misdn is not set
 # CONFIG_PACKAGE_kmod-nat46 is not set
 # CONFIG_PACKAGE_kmod-netem is not set
@@ -1904,7 +1907,7 @@ CONFIG_PACKAGE_kmod-pppox=y
 # CONFIG_PACKAGE_kmod-sit is not set
 CONFIG_PACKAGE_kmod-slhc=y
 # CONFIG_PACKAGE_kmod-slip is not set
-# CONFIG_PACKAGE_kmod-stp is not set
+CONFIG_PACKAGE_kmod-stp=y
 # CONFIG_PACKAGE_kmod-trelay is not set
 # CONFIG_PACKAGE_kmod-tun is not set
 # CONFIG_PACKAGE_kmod-udptunnel4 is not set
@@ -2645,7 +2648,7 @@ CONFIG_PACKAGE_liblua=y
 # CONFIG_PACKAGE_libmysqlclient is not set
 # CONFIG_PACKAGE_libmysqlclient-r is not set
 # CONFIG_PACKAGE_libnatpmp is not set
-# CONFIG_PACKAGE_libncursesw is not set
+CONFIG_PACKAGE_libncursesw=y
 # CONFIG_PACKAGE_libneon is not set
 # CONFIG_PACKAGE_libnet-1.2.x is not set
 # CONFIG_PACKAGE_libnetconf is not set
@@ -2777,7 +2780,7 @@ CONFIG_PACKAGE_libustream-polarssl=y
 # CONFIG_PACKAGE_pthsem is not set
 # CONFIG_PACKAGE_sbc is not set
 # CONFIG_PACKAGE_shflags is not set
-# CONFIG_PACKAGE_terminfo is not set
+CONFIG_PACKAGE_terminfo=y
 # CONFIG_PACKAGE_tinycdb is not set
 # CONFIG_PACKAGE_uclibcxx is not set
 # CONFIG_PACKAGE_xmlrpc-c is not set
@@ -3113,7 +3116,8 @@ CONFIG_POSTFIX_CDB=y
 # CONFIG_PACKAGE_arptables is not set
 # CONFIG_PACKAGE_conntrack is not set
 # CONFIG_PACKAGE_conntrackd is not set
-# CONFIG_PACKAGE_ebtables is not set
+CONFIG_PACKAGE_ebtables=y
+# CONFIG_PACKAGE_ebtables-utils is not set
 # CONFIG_PACKAGE_fwknop is not set
 # CONFIG_PACKAGE_fwknopd is not set
 CONFIG_PACKAGE_ip6tables=y
@@ -3129,7 +3133,7 @@ CONFIG_PACKAGE_iptables=y
 # CONFIG_PACKAGE_iptables-mod-delude is not set
 # CONFIG_PACKAGE_iptables-mod-dhcpmac is not set
 # CONFIG_PACKAGE_iptables-mod-dnetmap is not set
-# CONFIG_PACKAGE_iptables-mod-extra is not set
+CONFIG_PACKAGE_iptables-mod-extra=y
 # CONFIG_PACKAGE_iptables-mod-filter is not set
 # CONFIG_PACKAGE_iptables-mod-fuzzy is not set
 # CONFIG_PACKAGE_iptables-mod-geoip is not set
@@ -3148,7 +3152,7 @@ CONFIG_PACKAGE_iptables=y
 # CONFIG_PACKAGE_iptables-mod-lua is not set
 # CONFIG_PACKAGE_iptables-mod-nat-extra is not set
 # CONFIG_PACKAGE_iptables-mod-nflog is not set
-# CONFIG_PACKAGE_iptables-mod-nfqueue is not set
+CONFIG_PACKAGE_iptables-mod-nfqueue=y
 # CONFIG_PACKAGE_iptables-mod-psd is not set
 # CONFIG_PACKAGE_iptables-mod-quota2 is not set
 # CONFIG_PACKAGE_iptables-mod-sysrq is not set
@@ -3867,7 +3871,7 @@ CONFIG_PACKAGE_wpad=y
 #
 # CONFIG_PACKAGE_joe is not set
 # CONFIG_PACKAGE_nano is not set
-# CONFIG_PACKAGE_vim is not set
+CONFIG_PACKAGE_vim=y
 # CONFIG_PACKAGE_vim-full is not set
 # CONFIG_PACKAGE_vim-help is not set
 # CONFIG_PACKAGE_vim-runtime is not set

@@ -1,0 +1,70 @@
+--- a/options.h
++++ b/options.h
+@@ -81,6 +81,7 @@ enum fw3_flag
+ 	FW3_FLAG_MTU_FIX       = 19,
+ 	FW3_FLAG_DROP_INVALID  = 20,
+ 	FW3_FLAG_HOTPLUG       = 21,
++	FW3_FLAG_DREAMCATCHER  = 22,
+ 
+ 	__FW3_FLAG_MAX
+ };
+@@ -301,6 +302,10 @@ struct fw3_zone
+ 	const char *extra_src;
+ 	const char *extra_dest;
+ 
++	// NEW NEW NEW
++	bool dreamcatcher;
++	// NEW NEW NEW
++
+ 	bool masq;
+ 	struct list_head masq_src;
+ 	struct list_head masq_dest;
+--- a/zones.c
++++ b/zones.c
+@@ -48,6 +48,8 @@ static const struct fw3_chain_spec zone_
+ 	C(V4,  NAT,    CUSTOM_CHAINS, "prerouting_%s_rule"),
+ 	C(V4,  NAT,    CUSTOM_CHAINS, "postrouting_%s_rule"),
+ 
++	C(ANY, FILTER, DREAMCATCHER,  "DREAMCATCHER_%s_rule"),
++
+ 	{ }
+ };
+ 
+@@ -65,6 +67,8 @@ const struct fw3_option fw3_zone_opts[]
+ 	FW3_OPT("forward",             target,   zone,     policy_forward),
+ 	FW3_OPT("output",              target,   zone,     policy_output),
+ 
++	FW3_OPT("DREAMCATCHER",        bool,     zone,     dreamcatcher),
++
+ 	FW3_OPT("masq",                bool,     zone,     masq),
+ 	FW3_LIST("masq_src",           network,  zone,     masq_src),
+ 	FW3_LIST("masq_dest",          network,  zone,     masq_dest),
+@@ -214,6 +218,12 @@ fw3_load_zones(struct fw3_state *state,
+ 
+ 		resolve_networks(e, zone);
+ 
++		if (zone->dreamcatcher)
++		{
++			setbit(zone->flags[0], FW3_FLAG_DREAMCATCHER);
++			setbit(zone->flags[1], FW3_FLAG_DREAMCATCHER);
++		}
++
+ 		if (zone->masq)
+ 		{
+ 			setbit(zone->flags[0], FW3_FLAG_SNAT);
+@@ -489,6 +499,15 @@ print_zone_rule(struct fw3_ipt_handle *h
+ 			fw3_ipt_rule_append(r, "zone_%s_forward", zone->name);
+ 		}
+ 
++		// this should go here specifically, after all the other firewall rules but before the default rule
++		if (has(zone->flags, handle->family, FW3_FLAG_DREAMCATCHER))
++		{
++			r = fw3_ipt_rule_new(handle);
++			fw3_ipt_rule_comment(r, "DREAMCATCHER chain");
++			fw3_ipt_rule_target(r, "DREAMCATCHER_%s_rule", zone->name);
++			fw3_ipt_rule_append(r, "zone_%s_forward", zone->name);
++		}
++
+ 		r = fw3_ipt_rule_new(handle);
+ 		fw3_ipt_rule_target(r, "zone_%s_src_%s", zone->name,
+ 		                     fw3_flag_names[zone->policy_input]);
