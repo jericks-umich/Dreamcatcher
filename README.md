@@ -19,3 +19,14 @@ the configuration files and patches into place, and run `make`.
     -s  skip intro updates (useful when rebuilding)
     -i  install required dependencies (apt-get based only) 
 
+# Post-installation
+You will need to copy over some configuration files to set up the freeradius2
+RADIUS server, certificates, etc.
+Use scp to copy freeradius2/ to /etc/freeradius2/ on the router, and CA/ to
+/root/CA/ on the router.
+Then, restart the RADIUS server with `/etc/init.d/radiusd restart`.
+
+In a future commit, we will want to automate this configuration and generate
+new certificates, etc. during the install.
+
+
