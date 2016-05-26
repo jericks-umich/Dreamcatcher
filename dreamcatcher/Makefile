@@ -12,6 +12,7 @@ define Package/dreamcatcher
 	CATEGORY:=Network
 	SUBMENU:=Firewall
 	TITLE:=Dreamcatcher intra-network filter
+	DEPENDS:=+libnetfilter-queue +iptables-mod-nfqueue +kmod-ipt-nfqueue +kmod-nfnetlink-queue
 endef
 
 define Package/bridge/description
