@@ -10,6 +10,7 @@ THIS_DIR="$( cd "$( /usr/bin/dirname "${BASH_SOURCE[0]}" )" && /bin/pwd )"
 OPENWRT_DIR=$THIS_DIR/openwrt
 CONFIG_DIR=$THIS_DIR/config
 PATCH_DIR=$THIS_DIR/patches
+DREAMCATCHER_DIR=$THIS_DIR/dreamcatcher
 DEPS="git-core build-essential libssl-dev libncurses5-dev unzip gawk"
 
 for arg in "$@"; do
@@ -61,6 +62,10 @@ ln -s $CONFIG_DIR/build_config $OPENWRT_DIR/.config
 echo "Linking patches to openwrt build..."
 rm $OPENWRT_DIR/package/network/services/hostapd/patches/701-static_bridge_vlan_naming.patch 2>/dev/null
 ln -s $PATCH_DIR/701-static_bridge_vlan_naming.patch $OPENWRT_DIR/package/network/services/hostapd/patches/
+
+# add dreamcatcher package
+rm $OPENWRT_DIR/package/network/utils/dreamcatcher
+ln -s $DREAMCATCHER_DIR $OPENWRT_DIR/package/network/utils/dreamcatcher
 
 # make openwrt
 echo "Building openwrt. This may take a while."
