@@ -1,0 +1,19 @@
+Inserting this package into the OpenWRT build system is a little 
+hard to parse.
+
+The Makefile in this directory is run by OpenWRT's build system,
+described here: https://wiki.openwrt.org/doc/devel/packages
+
+We choose to include the source in the package directory itself
+(most packages are downloaded from remote servers at build-time),
+which usually means we would include a Makefile inside the src/
+directory as well.
+
+However, to compile on the OpenWRT-specific hardware, we want to
+use the OpenWRT buildroot system, one component of which is a
+mips-openwrt-linux-musl-gcc compiler that is *also* made during
+the build process... so rather than try to monkeypatch that 
+together, we're just using the Build/Compile target in OpenWRT's
+outer Makefile.
+
+
