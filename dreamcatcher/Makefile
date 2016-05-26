@@ -24,8 +24,10 @@ define Build/Prepare
 	$(CP) ./src/* $(PKG_BUILD_DIR)
 endef
 
+LDFLAGS += -Wl,-rpath-link=$(STAGING_DIR)/usr/lib -lnetfilter_queue
+
 define Build/Compile
-	$(TARGET_CC) $(TARGET_CFLAGS) -o $(PKG_BUILD_DIR)/dreamcatcher $(PKG_BUILD_DIR)/dreamcatcher.c
+	$(TARGET_CC) $(TARGET_CFLAGS) $(LDFLAGS) -o $(PKG_BUILD_DIR)/dreamcatcher $(PKG_BUILD_DIR)/dreamcatcher.c
 endef
 
 define Package/dreamcatcher/install
