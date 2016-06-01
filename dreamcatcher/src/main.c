@@ -2,6 +2,8 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
+#include <pthread.h>
+#include <semaphore.h>
 
 #include <netinet/in.h>
 #include <linux/types.h>
@@ -14,8 +16,10 @@
 #include <netinet/udp.h>
 #include <netinet/ip_icmp.h>
 
+#include <main.h>
 #include <protocols.h>
-#include <dreamcatcher.h>
+#include <config.h>
+
 
 /* returns packet id */
 u_int32_t orig_print_pkt (struct nfq_data *tb)
@@ -236,8 +240,9 @@ void print_icmp(struct icmphdr* i) {
 
 int cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struct nfq_data *nfa, void *data)
 {
+  int id;
 	char response;
-	u_int32_t id = print_pkt(nfa);
+  id = print_pkt(nfa);
 	printf("ACCEPT (Yy) or REJECT (Nn) this packet [Y/n]: ");
 	fflush(stdout);
 	scanf("%c", &response);
@@ -255,58 +260,64 @@ int main(int argc, char **argv)
 	int fd;
 	int rv;
 	char buf[4096] __attribute__ ((aligned));
+  pthread_t monitor_thread; 
+  int ret;
 
+  // clear out any previous temporary rules -- we don't have state for them anymore -- need to recreate them if we want them again
+  clean_config();
+
+  // create a new thread to monitor the config file for updates and 
+  printf("creating new monitor thread\n");
+  pthread_mutex_init(&thread_quit_lock, NULL); // initialize quit mutex
+  thread_quit = 0; // initialize quit value -- when set to 1, thread should quit
+  pthread_create(&monitor_thread, NULL, monitor_config, (void*)monitor_thread); // create new thread to monitor the config file
+
+  // create handle to nfqueue and watch for new packets to handle
 	printf("opening library handle\n");
 	h = nfq_open();
 	if (!h) {
 		fprintf(stderr, "error during nfq_open()\n");
 		exit(1);
 	}
-
 	printf("unbinding existing nf_queue handler for AF_INET (if any)\n");
 	if (nfq_unbind_pf(h, AF_INET) < 0) {
 		fprintf(stderr, "error during nfq_unbind_pf()\n");
 		exit(1);
 	}
-
 	printf("binding nfnetlink_queue as nf_queue handler for AF_INET\n");
 	if (nfq_bind_pf(h, AF_INET) < 0) {
 		fprintf(stderr, "error during nfq_bind_pf()\n");
 		exit(1);
 	}
-
 	printf("binding this socket to queue '%d'\n", QUEUE_NUM);
 	qh = nfq_create_queue(h, QUEUE_NUM, &cb, NULL);
 	if (!qh) {
 		fprintf(stderr, "error during nfq_create_queue()\n");
 		exit(1);
 	}
-
 	printf("setting copy_packet mode\n");
 	if (nfq_set_mode(qh, NFQNL_COPY_PACKET, 0xffff) < 0) {
 		fprintf(stderr, "can't set packet_copy mode\n");
 		exit(1);
 	}
-
 	fd = nfq_fd(h);
-
 	while ((rv = recv(fd, buf, sizeof(buf), 0)) && rv >= 0) {
 		printf("pkt received\n");
 		nfq_handle_packet(h, buf, rv);
 	}
-
 	printf("unbinding from queue %d\n", QUEUE_NUM);
 	nfq_destroy_queue(qh);
-
-#ifdef INSANE
-	/* normally, applications SHOULD NOT issue this command, since
-	 * it detaches other programs/sockets from AF_INET, too ! */
-	printf("unbinding from AF_INET\n");
-	nfq_unbind_pf(h, AF_INET);
-#endif
-
 	printf("closing library handle\n");
 	nfq_close(h);
+
+  // if we're ready to quit, signal the monitoring thread to exit and wait for it
+  printf("signaling monitoring thread to exit\n");
+  pthread_mutex_lock(&thread_quit_lock);
+  thread_quit = 1; // tell monitoring thread to exit
+  pthread_mutex_unlock(&thread_quit_lock);
+  printf("waiting for monitoring thread to exit\n");
+  pthread_join(monitor_thread, NULL); // wait for monitoring thread
+  pthread_exit(NULL);
 
 	exit(0);
 }
