@@ -17,7 +17,9 @@
 #include <main.h>
 #include <protocols.h>
 #include <config.h>
+#include <logger.h>
 
+#define TAG "MAIN"
 
 /* returns packet id */
 u_int32_t orig_print_pkt (struct nfq_data *tb)
@@ -32,43 +34,41 @@ u_int32_t orig_print_pkt (struct nfq_data *tb)
 	ph = nfq_get_msg_packet_hdr(tb);
 	if (ph) {
 		id = ntohl(ph->packet_id);
-		printf("hw_protocol=0x%04x hook=%u id=%u ", ntohs(ph->hw_protocol), ph->hook, id);
+		LOGV("hw_protocol=0x%04x hook=%u id=%u ", ntohs(ph->hw_protocol), ph->hook, id);
 	}
 
 	hwph = nfq_get_packet_hw(tb);
 	if (hwph) {
 		int i, hlen = ntohs(hwph->hw_addrlen);
 
-		printf("hw_src_addr=");
+		LOGV("hw_src_addr=");
 		for (i = 0; i < hlen-1; i++)
-			printf("%02x:", hwph->hw_addr[i]);
-		printf("%02x ", hwph->hw_addr[hlen-1]);
+			LOGV("%02x:", hwph->hw_addr[i]);
+		LOGV("%02x ", hwph->hw_addr[hlen-1]);
 	}
 
 	mark = nfq_get_nfmark(tb);
 	if (mark)
-		printf("mark=%u ", mark);
+		LOGV("mark=%u ", mark);
 
 	ifi = nfq_get_indev(tb);
 	if (ifi)
-		printf("indev=%u ", ifi);
+		LOGV("indev=%u ", ifi);
 
 	ifi = nfq_get_outdev(tb);
 	if (ifi)
-		printf("outdev=%u ", ifi);
+		LOGV("outdev=%u ", ifi);
 	ifi = nfq_get_physindev(tb);
 	if (ifi)
-		printf("physindev=%u ", ifi);
+		LOGV("physindev=%u ", ifi);
 
 	ifi = nfq_get_physoutdev(tb);
 	if (ifi)
-		printf("physoutdev=%u ", ifi);
+		LOGV("physoutdev=%u ", ifi);
 
 	ret = nfq_get_payload(tb, &data);
 	if (ret >= 0)
-		printf("payload_len=%d ", ret);
-
-	fputc('\n', stdout);
+		LOGV("payload_len=%d ", ret);
 
 	return id;
 }
@@ -85,19 +85,19 @@ void ip_to_bytes(unsigned char* buf, __be32 addr)
 void print_ipv4(struct ip* i)
 {
 	// print out ip header info
-	printf("~~~ IPv4 HEADER: ~~~\n");
-	printf("version:         %hhu\n", i->ip_v);
-	printf("Header length:   %hhu\n", i->ip_hl);
-	printf("TOS:             %hhu\n", i->ip_tos);
-	printf("Total Length:    %hu\n", i->ip_len);
-	printf("ID:              %hu\n", i->ip_id);
+	LOGV("~~~ IPv4 HEADER: ~~~");
+	LOGV("version:         %hhu", i->ip_v);
+	LOGV("Header length:   %hhu", i->ip_hl);
+	LOGV("TOS:             %hhu", i->ip_tos);
+	LOGV("Total Length:    %hu", i->ip_len);
+	LOGV("ID:              %hu", i->ip_id);
 
-	printf("Fragment Offset: %hu\n", i->ip_off);
-	printf("Time-to-Live:    %hhu\n", i->ip_ttl);
-	printf("Protocol:        %hhu\n", i->ip_p);
-	printf("Checksum:        %hu\n", i->ip_sum);
-	printf("Source Address:  %s\n", inet_ntoa(i->ip_src));
-	printf("Dest Address:    %s\n", inet_ntoa(i->ip_dst));
+	LOGV("Fragment Offset: %hu", i->ip_off);
+	LOGV("Time-to-Live:    %hhu", i->ip_ttl);
+	LOGV("Protocol:        %hhu", i->ip_p);
+	LOGV("Checksum:        %hu", i->ip_sum);
+	LOGV("Source Address:  %s", inet_ntoa(i->ip_src));
+	LOGV("Dest Address:    %s", inet_ntoa(i->ip_dst));
 
 	// Do any Option header checking here
 }
@@ -105,7 +105,7 @@ void print_ipv4(struct ip* i)
 // Input: ip6_hdr* data structure to print
 void print_ipv6(struct ip6_hdr* i)
 {
-	printf("IPv6 is not implemented yet (what else is new, lol)\n");
+	LOGV("IPv6 is not implemented yet (what else is new, lol)");
 }
 
 u_int32_t print_pkt (struct nfq_data *tb)
@@ -127,27 +127,25 @@ u_int32_t print_pkt (struct nfq_data *tb)
 	/////////////
 	ret = nfq_get_payload(tb, &data);
 	if (ret < 0) {
-		printf("empty packet. nothing to do here...\n");
+		LOGD("empty packet. nothing to do here...");
 		return id;
 	}
 	ip = (struct ip*) data;
 	// check if ipv4 or ipv6
 	switch (ip->ip_v) { // ip version
 		case 4:
-			//printf("IPv4 !\n");
 			proto = ip->ip_p; // get protocol from ipv4 header
 			data = data + (4 * ip->ip_hl); // increment data pointer to next header
 			print_ipv4(ip);
 			break;
 		case 6:
-			//printf("IPv6 !\n");
 			ipv6 = (struct ip6_hdr*) data;
 			proto = -1; // TODO: find protocol in ipv6 header
 			data = data + (4 * 0); // TODO: find end of ipv6 header and advance data to next header
 			print_ipv6(ipv6); // side-effect, increments data to layer 4
 			break;
 		default:
-			printf("Unknown Layer 3 protocol: %hhu. Not handled.\n",ip->ip_v);
+			LOGD("Unknown Layer 3 protocol: %hhu. Not handled.",ip->ip_v);
 	}
 
 	/////////////
@@ -169,7 +167,7 @@ u_int32_t print_pkt (struct nfq_data *tb)
 			break;
 			//case SCTP : // not implemented (yet?)
 		default :
-			printf("Unknown protocol %hhu. Not handled.\n", proto);
+			LOGD("Unknown protocol %hhu. Not handled.", proto);
 	}
 
 	return id;
@@ -179,13 +177,13 @@ void print_tcp(struct tcphdr* t) {
 	char flags[24]; // flags string
 	flags[0] = '\0';
 	// print out tcp header
-	printf("~~~ TCP HEADER: ~~~\n");
-	printf("Source Port:     %hu\n", t->th_sport);
-	printf("Dest Port:       %hu\n", t->th_dport);
-	printf("Sequence num:    %u\n", t->th_seq);
-	printf("Acknowledge num: %u\n", t->th_ack);
-	printf("Data offset:     %hhu\n", t->th_off);
-	printf("Reserved:        %hhu\n", t->th_x2);
+	LOGV("~~~ TCP HEADER: ~~~");
+	LOGV("Source Port:     %hu", t->th_sport);
+	LOGV("Dest Port:       %hu", t->th_dport);
+	LOGV("Sequence num:    %u", t->th_seq);
+	LOGV("Acknowledge num: %u", t->th_ack);
+	LOGV("Data offset:     %hhu", t->th_off);
+	LOGV("Reserved:        %hhu", t->th_x2);
 	if (t->th_flags & TH_URG)
 		strcat(flags, "URG ");
 	else
@@ -210,10 +208,10 @@ void print_tcp(struct tcphdr* t) {
 		strcat(flags, "FIN");
 	else
 		strcat(flags, " - ");
-	printf("Flags:           %s\n", flags);
-	printf("Window size:     %hu\n", t->th_win);
-	printf("Checksum         %hu\n", t->th_sum);
-	printf("Urgent pointer   0x%hx\n", t->th_urp);
+	LOGV("Flags:           %s", flags);
+	LOGV("Window size:     %hu", t->th_win);
+	LOGV("Checksum         %hu", t->th_sum);
+	LOGV("Urgent pointer   0x%hx", t->th_urp);
 
 	// Do any Option header checking here
 
@@ -221,19 +219,19 @@ void print_tcp(struct tcphdr* t) {
 }
 
 void print_udp(struct udphdr* u) {
-	printf("~~~ UDP HEADER: ~~~\n");
-	printf("Source Port:     %hu\n", u->uh_sport);
-	printf("Dest Port:       %hu\n", u->uh_dport);
-	printf("Length:          %hu\n", u->uh_ulen);
-	printf("Checksum:        %hu\n", u->uh_sum);
+	LOGV("~~~ UDP HEADER: ~~~");
+	LOGV("Source Port:     %hu", u->uh_sport);
+	LOGV("Dest Port:       %hu", u->uh_dport);
+	LOGV("Length:          %hu", u->uh_ulen);
+	LOGV("Checksum:        %hu", u->uh_sum);
 }
 
 void print_icmp(struct icmphdr* i) {
-	printf("~~~ ICMP HEADER: ~~~\n");
-	printf("Message type:    %hhu\n", i->type);
-	printf("Message code:    %hhu\n", i->code);
-	printf("Checksum:        %hhu\n", i->checksum);
-	printf("Rest of header:  0x%x\n", (unsigned int)i->un.gateway); // just grabbing any union field
+	LOGV("~~~ ICMP HEADER: ~~~");
+	LOGV("Message type:    %hhu", i->type);
+	LOGV("Message code:    %hhu", i->code);
+	LOGV("Checksum:        %hhu", i->checksum);
+	LOGV("Rest of header:  0x%x", (unsigned int)i->un.gateway); // just grabbing any union field
 }
 
 int cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struct nfq_data *nfa, void *data)
@@ -263,41 +261,41 @@ int main(int argc, char **argv)
   clean_config();
 
   // create handle to nfqueue and watch for new packets to handle
-	printf("opening library handle\n");
+	LOGV("opening library handle");
 	h = nfq_open();
 	if (!h) {
-		fprintf(stderr, "error during nfq_open()\n");
+		LOGE("error during nfq_open()");
 		exit(1);
 	}
-	printf("unbinding existing nf_queue handler for AF_INET (if any)\n");
+	LOGV("unbinding existing nf_queue handler for AF_INET (if any)");
 	if (nfq_unbind_pf(h, AF_INET) < 0) {
-		fprintf(stderr, "error during nfq_unbind_pf()\n");
+		LOGE("error during nfq_unbind_pf()");
 		exit(1);
 	}
-	printf("binding nfnetlink_queue as nf_queue handler for AF_INET\n");
+	LOGV("binding nfnetlink_queue as nf_queue handler for AF_INET");
 	if (nfq_bind_pf(h, AF_INET) < 0) {
-		fprintf(stderr, "error during nfq_bind_pf()\n");
+		LOGE("error during nfq_bind_pf()");
 		exit(1);
 	}
-	printf("binding this socket to queue '%d'\n", QUEUE_NUM);
+	LOGV("binding this socket to queue '%d'", QUEUE_NUM);
 	qh = nfq_create_queue(h, QUEUE_NUM, &cb, NULL);
 	if (!qh) {
-		fprintf(stderr, "error during nfq_create_queue()\n");
+		LOGE("error during nfq_create_queue()");
 		exit(1);
 	}
-	printf("setting copy_packet mode\n");
+	LOGV("setting copy_packet mode");
 	if (nfq_set_mode(qh, NFQNL_COPY_PACKET, 0xffff) < 0) {
-		fprintf(stderr, "can't set packet_copy mode\n");
+		LOGE("can't set packet_copy mode");
 		exit(1);
 	}
 	fd = nfq_fd(h);
 	while ((rv = recv(fd, buf, sizeof(buf), 0)) && rv >= 0) {
-		printf("pkt received\n");
+		LOGV("pkt received");
 		nfq_handle_packet(h, buf, rv);
 	}
-	printf("unbinding from queue %d\n", QUEUE_NUM);
+	LOGV("unbinding from queue %d", QUEUE_NUM);
 	nfq_destroy_queue(qh);
-	printf("closing library handle\n");
+	LOGV("closing library handle");
 	nfq_close(h);
 
 	exit(0);
