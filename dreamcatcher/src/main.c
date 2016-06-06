@@ -30,45 +30,50 @@ u_int32_t orig_print_pkt (struct nfq_data *tb)
 	u_int32_t mark,ifi; 
 	int ret;
 	unsigned char *data;
+#define BUF_SIZE 1024
+  char buf[BUF_SIZE];
+  buf[0] = '\0';
 
 	ph = nfq_get_msg_packet_hdr(tb);
 	if (ph) {
 		id = ntohl(ph->packet_id);
-		LOGV("hw_protocol=0x%04x hook=%u id=%u ", ntohs(ph->hw_protocol), ph->hook, id);
+		snprintf(buf+strlen(buf), BUF_SIZE-strlen(buf), "hw_protocol=0x%04x hook=%u id=%u ", ntohs(ph->hw_protocol), ph->hook, id);
 	}
 
 	hwph = nfq_get_packet_hw(tb);
 	if (hwph) {
 		int i, hlen = ntohs(hwph->hw_addrlen);
 
-		LOGV("hw_src_addr=");
+		snprintf(buf+strlen(buf), BUF_SIZE-strlen(buf), "hw_src_addr=");
 		for (i = 0; i < hlen-1; i++)
-			LOGV("%02x:", hwph->hw_addr[i]);
-		LOGV("%02x ", hwph->hw_addr[hlen-1]);
+			snprintf(buf+strlen(buf), BUF_SIZE-strlen(buf), "%02x:", hwph->hw_addr[i]);
+		snprintf(buf+strlen(buf), BUF_SIZE-strlen(buf), "%02x ", hwph->hw_addr[hlen-1]);
 	}
 
 	mark = nfq_get_nfmark(tb);
 	if (mark)
-		LOGV("mark=%u ", mark);
+		snprintf(buf+strlen(buf), BUF_SIZE-strlen(buf), "mark=%u ", mark);
 
 	ifi = nfq_get_indev(tb);
 	if (ifi)
-		LOGV("indev=%u ", ifi);
+		snprintf(buf+strlen(buf), BUF_SIZE-strlen(buf), "indev=%u ", ifi);
 
 	ifi = nfq_get_outdev(tb);
 	if (ifi)
-		LOGV("outdev=%u ", ifi);
+		snprintf(buf+strlen(buf), BUF_SIZE-strlen(buf), "outdev=%u ", ifi);
 	ifi = nfq_get_physindev(tb);
 	if (ifi)
-		LOGV("physindev=%u ", ifi);
+		snprintf(buf+strlen(buf), BUF_SIZE-strlen(buf), "physindev=%u ", ifi);
 
 	ifi = nfq_get_physoutdev(tb);
 	if (ifi)
-		LOGV("physoutdev=%u ", ifi);
+		snprintf(buf+strlen(buf), BUF_SIZE-strlen(buf), "physoutdev=%u ", ifi);
 
 	ret = nfq_get_payload(tb, &data);
 	if (ret >= 0)
-		LOGV("payload_len=%d ", ret);
+		snprintf(buf+strlen(buf), BUF_SIZE-strlen(buf), "payload_len=%d ", ret);
+
+  LOGV(buf);
 
 	return id;
 }
