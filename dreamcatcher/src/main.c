@@ -22,7 +22,7 @@
 #define TAG "MAIN"
 
 /* returns packet id */
-u_int32_t orig_print_pkt (struct nfq_data *tb)
+void orig_print_pkt (struct nfq_data *tb)
 {
 	int id = 0;
 	struct nfqnl_msg_packet_hdr *ph;
@@ -75,7 +75,7 @@ u_int32_t orig_print_pkt (struct nfq_data *tb)
 
   LOGV(buf);
 
-	return id;
+	return;
 }
 
 void ip_to_bytes(unsigned char* buf, __be32 addr)
@@ -113,9 +113,8 @@ void print_ipv6(struct ip6_hdr* i)
 	LOGV("IPv6 is not implemented yet (what else is new, lol)");
 }
 
-u_int32_t print_pkt (struct nfq_data *tb)
+void print_pkt (struct nfq_data *tb)
 {
-	int id = 0;
 	int ret;
 	u_int8_t proto = 0;
 	unsigned char *data;
@@ -125,7 +124,7 @@ u_int32_t print_pkt (struct nfq_data *tb)
 	struct udphdr* udp;
 	struct icmphdr* icmp;
 
-	id = orig_print_pkt(tb); // print the original packet information
+	orig_print_pkt(tb); // print the original packet information
 
 	/////////////
 	// Layer 3 //
@@ -133,7 +132,7 @@ u_int32_t print_pkt (struct nfq_data *tb)
 	ret = nfq_get_payload(tb, &data);
 	if (ret < 0) {
 		LOGD("empty packet. nothing to do here...");
-		return id;
+		return;
 	}
 	ip = (struct ip*) data;
 	// check if ipv4 or ipv6
@@ -175,7 +174,7 @@ u_int32_t print_pkt (struct nfq_data *tb)
 			LOGD("Unknown protocol %hhu. Not handled.", proto);
 	}
 
-	return id;
+	return;
 }
 
 void print_tcp(struct tcphdr* t) {
@@ -239,18 +238,24 @@ void print_icmp(struct icmphdr* i) {
 	LOGV("Rest of header:  0x%x", (unsigned int)i->un.gateway); // just grabbing any union field
 }
 
+void add_temp_rule(struct nfq_data *nfa) {
+// XXX
+}
+
 int cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struct nfq_data *nfa, void *data)
 {
+  int ret;
   int id;
-	char response;
-  id = print_pkt(nfa);
-	printf("ACCEPT (Yy) or REJECT (Nn) this packet [Y/n]: ");
-	fflush(stdout);
-	scanf("%c", &response);
-	if (response == 'n' || response == 'N') {
-		return nfq_set_verdict(qh, id, NF_DROP, 0, NULL);
-	}
-	return nfq_set_verdict(qh, id, NF_ACCEPT, 0, NULL);
+	struct nfqnl_msg_packet_hdr *ph = nfq_get_msg_packet_hdr(nfa);
+	if (ph) {
+		id = ntohl(ph->packet_id);
+  } else {
+    LOGW("Cannot parse packet. Not sure what to do!");
+  }
+  ret = nfq_set_verdict(qh, id, NF_DROP, 0, NULL);
+  print_pkt(nfa);
+  add_temp_rule(nfa);
+  return ret;
 }
 
 int main(int argc, char **argv)
