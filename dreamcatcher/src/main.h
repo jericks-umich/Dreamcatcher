@@ -21,6 +21,7 @@ void ip_to_bytes(unsigned char* buf, __be32 addr);
 void print_ipv4(struct ip* i);
 void print_ipv6(struct ip6_hdr* i);
 void print_pkt (struct nfq_data *tb);
+void reload_firewall();
 int cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struct nfq_data *nfa, void *data);
 int main(int argc, char **argv);
 void print_tcp(struct tcphdr* t);

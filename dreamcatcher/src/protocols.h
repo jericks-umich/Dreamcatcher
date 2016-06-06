@@ -60,6 +60,6 @@ typedef enum {
   ROHC  = 142             // ROHC    // Robust Header Compression
 } protocol;
 
-
+char* get_protocol_string(protocol proto);
 
 #endif // DREAMCATCHER_PROTOCOLS_H

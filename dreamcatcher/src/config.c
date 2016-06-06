@@ -9,16 +9,77 @@
 #include <main.h>
 #include <config.h>
 #include <logger.h>
+#include <protocols.h>
 
 #define TAG "CONFIG"
 
 #define CONFIG_FILE "/etc/config/dreamcatcher"
 
+#define MAX_TRIES 3
+
+// global variables
+temp_rule* new_rule;
+
+void create_new_rule() {
+  free(new_rule); // free any old rule
+  new_rule = calloc(1,sizeof(temp_rule)); // create new, blank, rule
+}
+
+void set_src_vlan(unsigned int src) {
+  new_rule->src_vlan = src;
+}
+
+void set_dst_vlan(unsigned int dst) {
+  new_rule->dst_vlan = dst;
+}
+
+void set_protocol(protocol p) {
+  new_rule->proto = p;
+}
+
+void set_src_port(unsigned int src) {
+  new_rule->src_port = src;
+}
+
+void set_dst_port(unsigned int dst) {
+  new_rule->dst_port = dst;
+}
+
+void set_target(verdict t) {
+  new_rule->target = t;
+}
+
+void write_rule() {
+  int fd;
+  int ret;
+  int tries = 0;
+  // lock the config file
+  LOGV("Locking config file");
+  fd = -1;
+  for (tries = 0; fd == -1 && tries < MAX_TRIES; tries++) {
+    fd = lock_open_config();
+  }
+  if (fd == -1) {
+    LOGE("Could not open or lock config file.");
+    exit(1);
+  }
+
+  // unlock the config file
+  LOGV("Unlocking config file");
+  ret = -1;
+  for (tries = 0; ret == -1 && tries < MAX_TRIES; tries++) {
+    ret = unlock_close_config();
+  }
+  if (ret == -1) {
+    LOGE("Could not unlock or close config file.");
+    exit(1);
+  }
+}
+
 void clean_config() {
   int ret;
   int fd;
   int tries = 0;
-#define MAX_TRIES 3
   struct uci_context* ctx;
   struct uci_package* pkg;
   struct uci_section* temp_rule_section;
@@ -77,11 +138,11 @@ void clean_config() {
 
   // unlock the config file
   LOGV("Unlocking config file");
-  fd = -1;
-  for (tries = 0; fd == -1 && tries < MAX_TRIES; tries++) {
-    fd = unlock_close_config();
+  ret = -1;
+  for (tries = 0; ret == -1 && tries < MAX_TRIES; tries++) {
+    ret = unlock_close_config();
   }
-  if (fd == -1) {
+  if (ret == -1) {
     LOGE("Could not unlock or close config file.");
     exit(1);
   }

@@ -7,6 +7,7 @@
 #include <linux/types.h>
 #include <linux/netfilter.h>            /* for NF_ACCEPT */
 #include <libnetfilter_queue/libnetfilter_queue.h>
+#include <libnfnetlink/libnfnetlink.h>
 #include <netinet/ip.h>
 #include <netinet/ip6.h>
 #include <arpa/inet.h>
@@ -30,6 +31,8 @@ void orig_print_pkt (struct nfq_data *tb)
 	u_int32_t mark,ifi; 
 	int ret;
 	unsigned char *data;
+  struct nlif_handle* h;
+  char ifname_buf[16];
 #define BUF_SIZE 1024
   char buf[BUF_SIZE];
   buf[0] = '\0';
@@ -57,6 +60,16 @@ void orig_print_pkt (struct nfq_data *tb)
 	ifi = nfq_get_indev(tb);
 	if (ifi)
 		snprintf(buf+strlen(buf), BUF_SIZE-strlen(buf), "indev=%u ", ifi);
+
+  h = nlif_open();
+  if (h == NULL) {
+    LOGE("nlif_open");
+    exit(1);
+  }
+  nlif_query(h);
+	nfq_get_indev_name(h, tb, ifname_buf);
+  nlif_close(h);
+  LOGV("indev name: %s", ifname_buf);
 
 	ifi = nfq_get_outdev(tb);
 	if (ifi)
@@ -113,10 +126,69 @@ void print_ipv6(struct ip6_hdr* i)
 	LOGV("IPv6 is not implemented yet (what else is new, lol)");
 }
 
+void add_temp_rule(struct nfq_data *tb) {
+	int ret;
+	protocol proto = 0;
+	unsigned char *data;
+	struct ip* ip;
+	struct ip6_hdr* ipv6;
+	struct tcphdr* tcp;
+	struct udphdr* udp;
+	struct icmphdr* icmp;
+
+	/////////////
+	// Layer 3 //
+	/////////////
+	ret = nfq_get_payload(tb, &data);
+	if (ret < 0) {
+		LOGD("empty packet. nothing to do here...");
+		return;
+	}
+	ip = (struct ip*) data;
+	// check if ipv4 or ipv6
+	switch (ip->ip_v) { // ip version
+		case 4:
+			proto = ip->ip_p; // get protocol from ipv4 header
+			data = data + (4 * ip->ip_hl); // increment data pointer to next header
+			//print_ipv4(ip);
+			break;
+		case 6:
+			ipv6 = (struct ip6_hdr*) data;
+			proto = -1; // TODO: find protocol in ipv6 header
+			data = data + (4 * 0); // TODO: find end of ipv6 header and advance data to next header
+			//print_ipv6(ipv6); // side-effect, increments data to layer 4
+			break;
+		default:
+			LOGD("Unknown Layer 3 protocol: %hhu. Not handled.",ip->ip_v);
+	}
+	/////////////
+	// Layer 4 //
+	/////////////
+	switch (proto) {
+		case TCP :
+			tcp = (struct tcphdr*) data;
+			//print_tcp(tcp);
+			break;
+		case UDP :
+			udp = (struct udphdr*) data;
+			//print_udp(udp);
+			break;
+		case ICMP : 
+			icmp = (struct icmphdr*) data;
+			//print_icmp(icmp);
+			break;
+			//case SCTP : // not implemented (yet?)
+		default :
+			LOGD("Unknown protocol %hhu. Not handled.", proto);
+	}
+
+	return;
+}
+
 void print_pkt (struct nfq_data *tb)
 {
 	int ret;
-	u_int8_t proto = 0;
+	protocol proto = 0;
 	unsigned char *data;
 	struct ip* ip;
 	struct ip6_hdr* ipv6;
@@ -155,7 +227,6 @@ void print_pkt (struct nfq_data *tb)
 	/////////////
 	// Layer 4 //
 	/////////////
-
 	switch (proto) {
 		case TCP :
 			tcp = (struct tcphdr*) data;
@@ -238,10 +309,6 @@ void print_icmp(struct icmphdr* i) {
 	LOGV("Rest of header:  0x%x", (unsigned int)i->un.gateway); // just grabbing any union field
 }
 
-void add_temp_rule(struct nfq_data *nfa) {
-// XXX
-}
-
 int cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struct nfq_data *nfa, void *data)
 {
   int ret;
@@ -255,7 +322,12 @@ int cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struct nfq_data *nfa, vo
   ret = nfq_set_verdict(qh, id, NF_DROP, 0, NULL);
   print_pkt(nfa);
   add_temp_rule(nfa);
+  reload_firewall();
   return ret;
+}
+
+void reload_firewall() {
+  // TODO: invoke firewall3 binary to reload the iptables config, including the updated dreamcatcher config file
 }
 
 int main(int argc, char **argv)
@@ -269,6 +341,8 @@ int main(int argc, char **argv)
 
   // clear out any previous temporary rules -- we don't have state for them anymore -- need to recreate them if we want them again
   clean_config();
+  // reload firewall
+  reload_firewall();
 
   // create handle to nfqueue and watch for new packets to handle
 	LOGV("opening library handle");

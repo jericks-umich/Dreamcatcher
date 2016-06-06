@@ -12,7 +12,7 @@ define Package/dreamcatcher
 	CATEGORY:=Network
 	SUBMENU:=Firewall
 	TITLE:=Dreamcatcher intra-network filter
-	DEPENDS:=+libnetfilter-queue +iptables-mod-nfqueue +kmod-ipt-nfqueue +kmod-nfnetlink-queue +libuci
+	DEPENDS:=+libnetfilter-queue +iptables-mod-nfqueue +kmod-ipt-nfqueue +kmod-nfnetlink +kmod-nfnetlink-queue +libuci
 endef
 
 define Package/bridge/description
@@ -24,13 +24,14 @@ define Build/Prepare
 	$(CP) ./src/* $(PKG_BUILD_DIR)
 endef
 
-LDFLAGS += -Wl,-rpath-link=$(STAGING_DIR)/usr/lib -lnetfilter_queue -luci
+LDFLAGS += -Wl,-rpath-link=$(STAGING_DIR)/usr/lib -lnetfilter_queue -luci -lnfnetlink
 
 define Build/Compile
 	$(TARGET_CC) $(TARGET_CFLAGS) $(LDFLAGS) -I$(PKG_BUILD_DIR) -o $(PKG_BUILD_DIR)/dreamcatcher \
 		$(PKG_BUILD_DIR)/main.c \
 		$(PKG_BUILD_DIR)/config.c \
-		$(PKG_BUILD_DIR)/logger.c
+		$(PKG_BUILD_DIR)/logger.c \
+		$(PKG_BUILD_DIR)/protocols.c
 endef
 
 define Package/dreamcatcher/install
