@@ -67,7 +67,7 @@ void orig_print_pkt (struct nfq_data *tb)
     exit(1);
   }
   nlif_query(h);
-	nfq_get_indev_name(h, tb, ifname_buf);
+	nfq_get_physindev_name(h, tb, ifname_buf);
   nlif_close(h);
   LOGV("indev name: %s", ifname_buf);
 
