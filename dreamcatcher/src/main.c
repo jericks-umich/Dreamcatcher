@@ -2,8 +2,6 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
-#include <pthread.h>
-#include <semaphore.h>
 
 #include <netinet/in.h>
 #include <linux/types.h>
@@ -260,17 +258,9 @@ int main(int argc, char **argv)
 	int fd;
 	int rv;
 	char buf[4096] __attribute__ ((aligned));
-  pthread_t monitor_thread; 
-  int ret;
 
   // clear out any previous temporary rules -- we don't have state for them anymore -- need to recreate them if we want them again
   clean_config();
-
-  // create a new thread to monitor the config file for updates and 
-  printf("creating new monitor thread\n");
-  pthread_mutex_init(&thread_quit_lock, NULL); // initialize quit mutex
-  thread_quit = 0; // initialize quit value -- when set to 1, thread should quit
-  pthread_create(&monitor_thread, NULL, monitor_config, (void*)monitor_thread); // create new thread to monitor the config file
 
   // create handle to nfqueue and watch for new packets to handle
 	printf("opening library handle\n");
@@ -309,15 +299,6 @@ int main(int argc, char **argv)
 	nfq_destroy_queue(qh);
 	printf("closing library handle\n");
 	nfq_close(h);
-
-  // if we're ready to quit, signal the monitoring thread to exit and wait for it
-  printf("signaling monitoring thread to exit\n");
-  pthread_mutex_lock(&thread_quit_lock);
-  thread_quit = 1; // tell monitoring thread to exit
-  pthread_mutex_unlock(&thread_quit_lock);
-  printf("waiting for monitoring thread to exit\n");
-  pthread_join(monitor_thread, NULL); // wait for monitoring thread
-  pthread_exit(NULL);
 
 	exit(0);
 }

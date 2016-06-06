@@ -4,7 +4,8 @@
 #include <fcntl.h>
 
 void clean_config();
-void* monitor_config(void* threadid);
+int lock_open_config();
+int lock_close_config();
 
 // global vars
 int fd;

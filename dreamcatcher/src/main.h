@@ -1,9 +1,6 @@
 #ifndef DREAMCATCHER_H
 #define DREAMCATCHER_H
 
-#include <pthread.h>
-#include <semaphore.h>
-
 #include <netinet/in.h>
 #include <linux/types.h>
 #include <linux/netfilter.h>            /* for NF_ACCEPT */
@@ -30,8 +27,5 @@ void print_tcp(struct tcphdr* t);
 void print_udp(struct udphdr* u);
 void print_icmp(struct icmphdr* i);
 
-// global variables
-pthread_mutex_t thread_quit_lock;
-int thread_quit;
 
 #endif // DREAMCATCHER_H
