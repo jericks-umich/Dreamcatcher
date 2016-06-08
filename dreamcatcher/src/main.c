@@ -224,6 +224,9 @@ void add_temp_rule(struct nfq_data *tb) {
 		case UDP :
 			udp = (struct udphdr*) data;
       new_rule.proto = UDP;
+      //if (ip->ip_v == 4) {
+      //  strncpy(new_rule.src_ip, inet_ntoa(ip->ip_src), sizeof(new_rule.src_ip));
+      //}
       //new_rule.src_port = (unsigned int) udp->uh_sport;
       new_rule.dst_port = (unsigned int) udp->uh_dport;
 			break;
