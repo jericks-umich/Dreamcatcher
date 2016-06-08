@@ -17,39 +17,9 @@
 
 #define MAX_TRIES 3
 
-// global variables
-temp_rule* new_rule;
-
-void create_new_rule() {
-  free(new_rule); // free any old rule
-  new_rule = calloc(1,sizeof(temp_rule)); // create new, blank, rule
-}
-
-void set_src_vlan(unsigned int src) {
-  new_rule->src_vlan = src;
-}
-
-void set_dst_vlan(unsigned int dst) {
-  new_rule->dst_vlan = dst;
-}
-
-void set_protocol(protocol p) {
-  new_rule->proto = p;
-}
-
-void set_src_port(unsigned int src) {
-  new_rule->src_port = src;
-}
-
-void set_dst_port(unsigned int dst) {
-  new_rule->dst_port = dst;
-}
-
-void set_target(verdict t) {
-  new_rule->target = t;
-}
-
-void write_rule() {
+// input: the temp_rule to be written to config file
+// return: 0 on success, -1 on failure
+int write_rule(temp_rule rule) {
   int fd;
   int ret;
   int tries = 0;
@@ -64,11 +34,23 @@ void write_rule() {
     exit(1);
   }
 
+  // print out the rule to be written
+  LOGV("New temp_rule:");
+  LOGV("src_vlan: %u", rule.src_vlan);
+  LOGV("dst_vlan: %u", rule.dst_vlan);
+  LOGV("protonum: %u", rule.proto);
+  LOGV("protocol: %s", get_protocol_string(rule.proto));
+  LOGV("src_port: %u", rule.src_port);
+  LOGV("dst_port: %u", rule.dst_port);
+  LOGV("target:   %d", rule.target);
+
+  // TODO: actually write the rule out to the config file
+
   // unlock the config file
   LOGV("Unlocking config file");
   ret = -1;
   for (tries = 0; ret == -1 && tries < MAX_TRIES; tries++) {
-    ret = unlock_close_config();
+    ret = unlock_close_config(fd);
   }
   if (ret == -1) {
     LOGE("Could not unlock or close config file.");

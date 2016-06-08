@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
+#include <errno.h>
 
 #include <netinet/in.h>
 #include <linux/types.h>
@@ -91,6 +92,7 @@ void orig_print_pkt (struct nfq_data *tb)
 	return;
 }
 
+// TODO: this function is apparently unused now, delete?
 void ip_to_bytes(unsigned char* buf, __be32 addr)
 {
 	buf[0] = addr && 0xff;
@@ -126,6 +128,44 @@ void print_ipv6(struct ip6_hdr* i)
 	LOGV("IPv6 is not implemented yet (what else is new, lol)");
 }
 
+unsigned int get_src_vlan(struct nfq_data *tb) {
+  struct nlif_handle* h;
+  char ifname_buf[16]; // IFNAMSIZ from linux kernel is 16
+  char* vlan_ptr;
+  h = nlif_open();
+  if (h == NULL) {
+    LOGW("nlif_open failed.");
+    return (unsigned int) -1;
+  }
+  nlif_query(h);
+	nfq_get_physindev_name(h, tb, ifname_buf);
+  nlif_close(h);
+  LOGV("indev name: %s", ifname_buf);
+  strtok(ifname_buf, "."); // throw away the first pointer pointing to "wlanX" or another network prefix
+  vlan_ptr = strtok(NULL, "."); // vlan_ptr points to the vlan id now
+  LOGV("Attempting to convert string \"%s\" to integer", vlan_ptr);
+  return (unsigned int) strtol(vlan_ptr, NULL, 10); // returns 0 if unable to convert to integer
+}
+
+unsigned int get_dst_vlan(struct nfq_data *tb) {
+  struct nlif_handle* h;
+  char ifname_buf[16]; // IFNAMSIZ from linux kernel is 16
+  char* vlan_ptr;
+  h = nlif_open();
+  if (h == NULL) {
+    LOGW("nlif_open failed.");
+    return (unsigned int) -1;
+  }
+  nlif_query(h);
+	nfq_get_physoutdev_name(h, tb, ifname_buf);
+  nlif_close(h);
+  LOGV("outdev name: %s", ifname_buf);
+  strtok(ifname_buf, "."); // throw away the first pointer pointing to "wlanX" or another network prefix
+  vlan_ptr = strtok(NULL, "."); // vlan_ptr points to the vlan id now
+  LOGV("Attempting to convert string \"%s\" to integer", vlan_ptr);
+  return (unsigned int) strtol(vlan_ptr, NULL, 10); // returns 0 if unable to convert to integer
+}
+
 void add_temp_rule(struct nfq_data *tb) {
 	int ret;
 	protocol proto = 0;
@@ -135,6 +175,15 @@ void add_temp_rule(struct nfq_data *tb) {
 	struct tcphdr* tcp;
 	struct udphdr* udp;
 	struct icmphdr* icmp;
+  
+  temp_rule new_rule;
+
+  /////////////
+  // Layer 2 //
+  /////////////
+  
+  new_rule.src_vlan = get_src_vlan(tb);
+  new_rule.dst_vlan = get_dst_vlan(tb);
 
 	/////////////
 	// Layer 3 //
@@ -167,20 +216,31 @@ void add_temp_rule(struct nfq_data *tb) {
 	switch (proto) {
 		case TCP :
 			tcp = (struct tcphdr*) data;
-			//print_tcp(tcp);
+      new_rule.proto = TCP;
+      new_rule.src_port = (unsigned int) tcp->th_sport;
+      new_rule.dst_port = (unsigned int) tcp->th_dport;
 			break;
 		case UDP :
 			udp = (struct udphdr*) data;
-			//print_udp(udp);
+      new_rule.proto = UDP;
+      new_rule.src_port = (unsigned int) udp->uh_sport;
+      new_rule.dst_port = (unsigned int) udp->uh_dport;
 			break;
 		case ICMP : 
 			icmp = (struct icmphdr*) data;
-			//print_icmp(icmp);
+      new_rule.proto = ICMP;
+      new_rule.src_port = 0;
+      new_rule.dst_port = 0;
 			break;
 			//case SCTP : // not implemented (yet?)
 		default :
 			LOGD("Unknown protocol %hhu. Not handled.", proto);
 	}
+
+  new_rule.target = DROP;
+
+  // write the rule to the config file
+  write_rule(new_rule);
 
 	return;
 }
@@ -259,30 +319,12 @@ void print_tcp(struct tcphdr* t) {
 	LOGV("Acknowledge num: %u", t->th_ack);
 	LOGV("Data offset:     %hhu", t->th_off);
 	LOGV("Reserved:        %hhu", t->th_x2);
-	if (t->th_flags & TH_URG)
-		strcat(flags, "URG ");
-	else
-		strcat(flags, " -  ");
-	if (t->th_flags & TH_ACK)
-		strcat(flags, "ACK ");
-	else
-		strcat(flags, " -  ");
-	if (t->th_flags & TH_PUSH)
-		strcat(flags, "PSH ");
-	else
-		strcat(flags, " -  ");
-	if (t->th_flags & TH_RST)
-		strcat(flags, "RST ");
-	else
-		strcat(flags, " -  ");
-	if (t->th_flags & TH_SYN)
-		strcat(flags, "SYN ");
-	else
-		strcat(flags, " -  ");
-	if (t->th_flags & TH_FIN)
-		strcat(flags, "FIN");
-	else
-		strcat(flags, " - ");
+	if (t->th_flags & TH_URG)  { strcat(flags, "URG "); } else { strcat(flags, " -  "); }
+	if (t->th_flags & TH_ACK)  { strcat(flags, "ACK "); } else { strcat(flags, " -  "); }
+	if (t->th_flags & TH_PUSH) { strcat(flags, "PSH "); } else { strcat(flags, " -  "); }
+	if (t->th_flags & TH_RST)  { strcat(flags, "RST "); } else { strcat(flags, " -  "); }
+	if (t->th_flags & TH_SYN)  { strcat(flags, "SYN "); } else { strcat(flags, " -  "); }
+	if (t->th_flags & TH_FIN)  { strcat(flags, "FIN" ); } else { strcat(flags, " - "); }
 	LOGV("Flags:           %s", flags);
 	LOGV("Window size:     %hu", t->th_win);
 	LOGV("Checksum         %hu", t->th_sum);
@@ -319,7 +361,8 @@ int cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struct nfq_data *nfa, vo
   } else {
     LOGW("Cannot parse packet. Not sure what to do!");
   }
-  ret = nfq_set_verdict(qh, id, NF_DROP, 0, NULL);
+  ret = nfq_set_verdict(qh, id, NF_ACCEPT, 0, NULL);
+  LOGD("Set ACCEPT verdict. Return value: %d", ret);
   print_pkt(nfa);
   add_temp_rule(nfa);
   reload_firewall();
@@ -377,6 +420,7 @@ int main(int argc, char **argv)
 		LOGV("pkt received");
 		nfq_handle_packet(h, buf, rv);
 	}
+  LOGD("Quitting because we received %d: %s", rv, strerror(errno));
 	LOGV("unbinding from queue %d", QUEUE_NUM);
 	nfq_destroy_queue(qh);
 	LOGV("closing library handle");

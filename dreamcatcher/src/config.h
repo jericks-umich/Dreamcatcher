@@ -5,9 +5,6 @@
 
 #include <protocols.h>
 
-void clean_config();
-int lock_open_config();
-int unlock_close_config();
 
 typedef enum {
   ACCEPT,
@@ -15,7 +12,7 @@ typedef enum {
   REJECT,
 } verdict;
 
-/*
+/* EXAMPLE RULE
  config temp_rule
    option name "Block http from user 11 to user 10"
    option src 11
@@ -24,7 +21,7 @@ typedef enum {
    option dst_port 80
    option verdict REJECT
 */
-typedef struct {
+typedef struct temp_rule {
   unsigned int src_vlan;
   unsigned int dst_vlan;
   protocol proto;
@@ -33,6 +30,10 @@ typedef struct {
   verdict target;
 } temp_rule;
 
+int write_rule(temp_rule rule);
+void clean_config();
+int lock_open_config();
+int unlock_close_config();
 
 
 #endif // DREAMCATCHER_CONFIG_H
