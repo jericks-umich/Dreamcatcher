@@ -177,6 +177,7 @@ void add_temp_rule(struct nfq_data *tb) {
 	struct icmphdr* icmp;
   
   temp_rule new_rule;
+  memset(&new_rule, 0, sizeof(new_rule)); // zero out all fields
 
   /////////////
   // Layer 2 //
@@ -217,20 +218,18 @@ void add_temp_rule(struct nfq_data *tb) {
 		case TCP :
 			tcp = (struct tcphdr*) data;
       new_rule.proto = TCP;
-      new_rule.src_port = (unsigned int) tcp->th_sport;
+      //new_rule.src_port = (unsigned int) tcp->th_sport;
       new_rule.dst_port = (unsigned int) tcp->th_dport;
 			break;
 		case UDP :
 			udp = (struct udphdr*) data;
       new_rule.proto = UDP;
-      new_rule.src_port = (unsigned int) udp->uh_sport;
+      //new_rule.src_port = (unsigned int) udp->uh_sport;
       new_rule.dst_port = (unsigned int) udp->uh_dport;
 			break;
 		case ICMP : 
 			icmp = (struct icmphdr*) data;
       new_rule.proto = ICMP;
-      new_rule.src_port = 0;
-      new_rule.dst_port = 0;
 			break;
 			//case SCTP : // not implemented (yet?)
 		default :

@@ -7,14 +7,14 @@
 char* get_protocol_string(protocol proto) {
   switch (proto) {
     case TCP:
-      LOGV("TCP");
-      return "tcp";
+      //LOGV("TCP");
+      return "TCP";
     case UDP:
-      LOGV("UDP");
-      return "udp";
+      //LOGV("UDP");
+      return "UDP";
     case ICMP:
-      LOGV("ICMP");
-      return "icmp";
+      //LOGV("ICMP");
+      return "ICMP";
   } 
   return NULL;
 }
