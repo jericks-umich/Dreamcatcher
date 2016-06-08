@@ -11,6 +11,7 @@ OPENWRT_DIR=$THIS_DIR/openwrt
 CONFIG_DIR=$THIS_DIR/config
 PATCH_DIR=$THIS_DIR/patches
 DREAMCATCHER_DIR=$THIS_DIR/dreamcatcher
+LUCI_APP_DREAMCATCHER_DIR=$THIS_DIR/luci-app-dreamcatcher
 DEPS="git-core build-essential libssl-dev libncurses5-dev unzip gawk"
 
 for arg in "$@"; do
@@ -66,6 +67,10 @@ ln -s $PATCH_DIR/701-static_bridge_vlan_naming.patch $OPENWRT_DIR/package/networ
 # add dreamcatcher package
 rm $OPENWRT_DIR/package/network/utils/dreamcatcher
 ln -s $DREAMCATCHER_DIR $OPENWRT_DIR/package/network/utils/dreamcatcher
+
+# add luci-app-dreamcatcher package
+rm $OPENWRT_DIR/package/feeds/luci/luci-app-dreamcatcher
+ln -s $LUCI_APP_DREAMCATCHER_DIR $OPENWRT_DIR/package/feeds/luci/luci-app-dreamcatcher
 
 # make openwrt
 echo "Building openwrt. This may take a while."
