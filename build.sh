@@ -59,10 +59,14 @@ echo "Linking our config file into openwrt build directory..."
 rm $OPENWRT_DIR/.config 2>/dev/null
 ln -s $CONFIG_DIR/build_config $OPENWRT_DIR/.config
 
-# add patches to patch dir
+# add patches to openwrt
 echo "Linking patches to openwrt build..."
+# hostapd - add additional bridge naming scheme
 rm $OPENWRT_DIR/package/network/services/hostapd/patches/701-static_bridge_vlan_naming.patch 2>/dev/null
 ln -s $PATCH_DIR/701-static_bridge_vlan_naming.patch $OPENWRT_DIR/package/network/services/hostapd/patches/
+# firewall3 - add additional dreamcatcher firewall chain
+rm $OPENWRT_DIR/package/network/config/firewall/patches/701-dreamcatcher-chain.patch
+ln -s $PATCH_DIR/701-dreamcatcher-chain.patch $OPENWRT_DIR/package/network/config/firewall/patches/701-dreamcatcher-chain.patch
 
 # add dreamcatcher package
 rm $OPENWRT_DIR/package/network/utils/dreamcatcher
