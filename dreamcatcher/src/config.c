@@ -40,16 +40,16 @@ char* get_verdict_string(verdict v) {
   return NULL;
 }
 
-// input: the temp_rule to be written to config file
+// input: the rule to be written to config file
 // return: 0 on success, -1 on failure
-int write_rule(temp_rule rule) {
+int write_rule(rule r) {
   int fd;
   int ret;
   int tries = 0;
 
   struct uci_context* ctx;
   struct uci_package* pkg;
-  struct uci_section* temp_rule_section;
+  struct uci_section* rule_section;
 
   // lock the config file
   LOGV("Locking config file");
@@ -63,16 +63,16 @@ int write_rule(temp_rule rule) {
   }
 
   // print out the rule to be written
-  LOGV("New temp_rule:");
-  LOGV("src_vlan: %u", rule.src_vlan);
-  LOGV("dst_vlan: %u", rule.dst_vlan);
-  LOGV("protonum: %u", rule.proto);
-  LOGV("protocol: %s", get_protocol_string(rule.proto));
-  LOGV("src_ip:   %s", rule.src_ip);
-  LOGV("dst_ip:   %s", rule.dst_ip);
-  LOGV("src_port: %u", rule.src_port);
-  LOGV("dst_port: %u", rule.dst_port);
-  LOGV("target:   %d", rule.target);
+  LOGV("New rule:");
+  LOGV("src_vlan: %u", r.src_vlan);
+  LOGV("dst_vlan: %u", r.dst_vlan);
+  LOGV("protonum: %u", r.proto);
+  LOGV("protocol: %s", get_protocol_string(r.proto));
+  LOGV("src_ip:   %s", r.src_ip);
+  LOGV("dst_ip:   %s", r.dst_ip);
+  LOGV("src_port: %u", r.src_port);
+  LOGV("dst_port: %u", r.dst_port);
+  LOGV("target:   %d", r.target);
 
   // write the rule out to the config file
   // initialize
@@ -87,32 +87,32 @@ int write_rule(temp_rule rule) {
     uci_perror(ctx,""); // TODO: replace this with uci_get_errorstr() and use our own logging functions
   }
   // create new entry/section
-  ret = uci_add_section(ctx, pkg, "temp_rule", &temp_rule_section); // temp_rule_section now points at the new rule
+  ret = uci_add_section(ctx, pkg, "rule", &rule_section); // rule_section now points at the new rule
   if (ret != UCI_OK) {
     LOGW("Didn't properly add new section");
     uci_perror(ctx,""); // TODO: replace this with uci_get_errorstr() and use our own logging functions
   }
   // populate section
-  if (rule.src_vlan != 0) {
-    rule_uci_set_int(ctx, "src", rule.src_vlan);
+  if (r.src_vlan != 0) {
+    rule_uci_set_int(ctx, "src", r.src_vlan);
   }
-  if (rule.dst_vlan != 0) {
-    rule_uci_set_int(ctx, "dst", rule.dst_vlan);
+  if (r.dst_vlan != 0) {
+    rule_uci_set_int(ctx, "dst", r.dst_vlan);
   }
-  rule_uci_set_str(ctx, "proto", get_protocol_string(rule.proto));
-  if (strncmp(rule.src_ip, "\0", sizeof(rule.src_ip)) != 0) {
-    rule_uci_set_str(ctx, "src_ip", rule.src_ip);
+  rule_uci_set_str(ctx, "proto", get_protocol_string(r.proto));
+  if (strncmp(r.src_ip, "\0", sizeof(r.src_ip)) != 0) {
+    rule_uci_set_str(ctx, "src_ip", r.src_ip);
   }
-  if (strncmp(rule.dst_ip, "\0", sizeof(rule.dst_ip)) != 0) {
-    rule_uci_set_str(ctx, "dst_ip", rule.dst_ip);
+  if (strncmp(r.dst_ip, "\0", sizeof(r.dst_ip)) != 0) {
+    rule_uci_set_str(ctx, "dst_ip", r.dst_ip);
   }
-  if (rule.src_port != 0) {
-    rule_uci_set_int(ctx, "src_port", rule.src_port);
+  if (r.src_port != 0) {
+    rule_uci_set_int(ctx, "src_port", r.src_port);
   }
-  if (rule.dst_port != 0) {
-    rule_uci_set_int(ctx, "dst_port", rule.dst_port);
+  if (r.dst_port != 0) {
+    rule_uci_set_int(ctx, "dst_port", r.dst_port);
   }
-  rule_uci_set_str(ctx, "verdict", get_verdict_string(rule.target));
+  rule_uci_set_str(ctx, "verdict", get_verdict_string(r.target));
 
   // save and commit changes
   LOGV("Saving changes to config file");
@@ -145,7 +145,7 @@ void rule_uci_set_int(struct uci_context *ctx, const char* option, const unsigne
   struct uci_ptr ptr;
   char* ptr_string;
   ptr_string = malloc(128);
-  sprintf(ptr_string, "dreamcatcher.@temp_rule[-1].%s=%d", option, value);
+  sprintf(ptr_string, "dreamcatcher.@rule[-1].%s=%d", option, value);
   uci_lookup_ptr(ctx, &ptr, ptr_string, true);
   uci_set(ctx, &ptr);
   free(ptr_string);
@@ -155,7 +155,7 @@ void rule_uci_set_str(struct uci_context *ctx, const char* option, const char* v
   struct uci_ptr ptr;
   char* ptr_string;
   ptr_string = malloc(128);
-  sprintf(ptr_string, "dreamcatcher.@temp_rule[-1].%s=%s", option, value);
+  sprintf(ptr_string, "dreamcatcher.@rule[-1].%s=%s", option, value);
   uci_lookup_ptr(ctx, &ptr, ptr_string, true);
   uci_set(ctx, &ptr);
   free(ptr_string);
@@ -167,7 +167,7 @@ void clean_config() {
   int tries = 0;
   struct uci_context* ctx;
   struct uci_package* pkg;
-  struct uci_section* temp_rule_section;
+  struct uci_section* rule_section;
   struct uci_element* rule_ptr;
   struct uci_ptr ptr;
   char* ptr_string;
@@ -194,15 +194,15 @@ void clean_config() {
     LOGW("Didn't properly load config file");
     uci_perror(ctx,""); // TODO: replace this with uci_get_errorstr() and use our own logging functions
   }
-  // delete any and all temp_rule entries
-  LOGV("Deleting temp_rule entries from config file");
-  ptr_string = strdup("dreamcatcher.@temp_rule[-1]");
-  uci_lookup_ptr(ctx, &ptr, ptr_string, true); // get first temp_rule
+  // delete any and all rule entries
+  LOGV("Deleting rule entries from config file");
+  ptr_string = strdup("dreamcatcher.@rule[-1]");
+  uci_lookup_ptr(ctx, &ptr, ptr_string, true); // get first rule
   while (ptr.s != NULL) {
-    uci_delete(ctx, &ptr); // remove temp_rule
+    uci_delete(ctx, &ptr); // remove rule
     free(ptr_string);
-    ptr_string = strdup("dreamcatcher.@temp_rule[-1]");
-    uci_lookup_ptr(ctx, &ptr, ptr_string, true); // get first temp_rule
+    ptr_string = strdup("dreamcatcher.@rule[-1]");
+    uci_lookup_ptr(ctx, &ptr, ptr_string, true); // get first rule
   }
   free(ptr_string);
   // save and commit changes
