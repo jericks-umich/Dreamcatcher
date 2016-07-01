@@ -52,12 +52,16 @@ fi
 
 # from here, run every time build.sh is called
 
-# use our config file with everything we need in it
+# use our config file diff with everything we need in it
 # (Note: you can manually edit this configuration by cd'ing to the openwrt/
 #  directory and running 'make menuconfig')
-echo "Linking our config file into openwrt build directory..."
+echo "Updating OpenWRT build config file..."
 rm $OPENWRT_DIR/.config 2>/dev/null
-ln -s $CONFIG_DIR/build_config $OPENWRT_DIR/.config
+pushd $OPENWRT_DIR
+make defconfig
+cat $CONFIG_DIR/dreamcatcher.diff >> $OPENWRT_DIR/.config
+make defconfig
+popd
 
 # add patches to openwrt
 echo "Linking patches to openwrt build..."
@@ -67,14 +71,19 @@ ln -s $PATCH_DIR/701-static_bridge_vlan_naming.patch $OPENWRT_DIR/package/networ
 # firewall3 - add additional dreamcatcher firewall chain
 rm $OPENWRT_DIR/package/network/config/firewall/patches/701-dreamcatcher-chain.patch
 ln -s $PATCH_DIR/701-dreamcatcher-chain.patch $OPENWRT_DIR/package/network/config/firewall/patches/701-dreamcatcher-chain.patch
+# firewall3 - allow reloading of dreamcatcher firewall chain
+# don't build while still under development
+#rm $OPENWRT_DIR/package/network/config/firewall/patches/702-dreamcatcher-firewall-reload.patch
+#ln -s $PATCH_DIR/702-dreamcatcher-firewall-reload.patch $OPENWRT_DIR/package/network/config/firewall/patches/702-dreamcatcher-firewall-reload.patch
 
 # add dreamcatcher package
 rm $OPENWRT_DIR/package/network/utils/dreamcatcher
 ln -s $DREAMCATCHER_DIR $OPENWRT_DIR/package/network/utils/dreamcatcher
 
 # add luci-app-dreamcatcher package
-rm $OPENWRT_DIR/package/feeds/luci/luci-app-dreamcatcher
-ln -s $LUCI_APP_DREAMCATCHER_DIR $OPENWRT_DIR/package/feeds/luci/luci-app-dreamcatcher
+# don'e build while still under development
+#rm $OPENWRT_DIR/package/feeds/luci/luci-app-dreamcatcher
+#ln -s $LUCI_APP_DREAMCATCHER_DIR $OPENWRT_DIR/package/feeds/luci/luci-app-dreamcatcher
 
 # make openwrt
 echo "Building openwrt. This may take a while."

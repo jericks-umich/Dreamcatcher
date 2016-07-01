@@ -1,0 +1,526 @@
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -17,7 +17,7 @@ ELSE()
+   ADD_DEFINITIONS(-DDISABLE_IPV6)
+ ENDIF()
+ 
+-ADD_EXECUTABLE(firewall3 main.c options.c defaults.c zones.c forwards.c rules.c redirects.c snats.c utils.c ubus.c ipsets.c includes.c iptables.c)
++ADD_EXECUTABLE(firewall3 main.c options.c defaults.c zones.c forwards.c rules.c redirects.c snats.c utils.c ubus.c ipsets.c includes.c iptables.c dreamcatcher.c)
+ TARGET_LINK_LIBRARIES(firewall3 uci ubox ubus xtables m dl ${iptc_libs} ${ext_libs})
+ 
+ SET(CMAKE_INSTALL_PREFIX /usr)
+--- /dev/null
++++ b/dreamcatcher.c
+@@ -0,0 +1,182 @@
++#include "dreamcatcher.h"
++
++const struct fw3_option fw3_dreamcatcher_rule_opts[] = {
++  //FW3_OPT("name",                string,    rule,     name),
++  FW3_OPT("title",               int,       dreamcatcher_rule,     title),
++  FW3_OPT("src_vlan",            vlan,      dreamcatcher_rule,     src_vlan),
++  FW3_OPT("dst_vlan",            vlan,      dreamcatcher_rule,     dst_vlan),
++  FW3_OPT("proto",               protocol,  dreamcatcher_rule,     proto),
++  FW3_OPT("src_ip",              address,   dreamcatcher_rule,     ip_src),
++  FW3_OPT("dst_ip",              address,   dreamcatcher_rule,     ip_dst),
++  FW3_OPT("src_port",            port,      dreamcatcher_rule,     port_src),
++  FW3_OPT("dst_port",            port,      dreamcatcher_rule,     port_dst),
++  FW3_OPT("target",              target,    dreamcatcher_rule,     target),
++
++  { }
++};
++
++const struct fw3_option fw3_dreamcatcher_info_opts[] = {
++  FW3_LIST("interface_prefix",   interface,    dreamcatcher_info,     interface_prefix),
++
++  { }
++};
++
++void fw3_load_dreamcatcher_info(struct fw3_state *state, struct uci_package *p) {
++  struct uci_section *s;
++  struct uci_element *e;
++  struct fw3_dreamcatcher_info *info;
++
++  INIT_LIST_HEAD(&state->dreamcatcher_infos);
++
++	uci_foreach_element(&p->sections, e) {
++    s = uci_to_section(e);
++
++    if (strcmp(s->type, "info")) { // if not an "info" section
++      continue;
++    }
++
++    info = calloc(1, sizeof(*info)); // allocate new dreamcatcher info
++    if (!info) {
++      continue;
++    }
++		list_add_tail(&info->list, &state->dreamcatcher_infos); // add info to list of dreamcatcher infos
++
++    fw3_parse_options(info, fw3_dreamcatcher_info_opts, s); // parse the config file and put options in proper places
++
++    // do any detection of invalid options here
++  }
++}
++
++void fw3_load_dreamcatcher_rules(struct fw3_state *state, struct uci_package *p) {
++  struct uci_section *s;
++  struct uci_element *e;
++  struct fw3_dreamcatcher_rule *rule;
++
++  INIT_LIST_HEAD(&state->dreamcatcher_rules);
++
++	uci_foreach_element(&p->sections, e) {
++    s = uci_to_section(e);
++
++    if (strcmp(s->type, "rule")) { // if not a "rule"
++      continue;
++    }
++
++    rule = calloc(1, sizeof(*rule)); // allocate new dreamcatcher rule
++    if (!rule) {
++      continue;
++    }
++		list_add_tail(&rule->list, &state->dreamcatcher_rules); // add rule to list of dreamcatcher rules
++
++    fw3_parse_options(rule, fw3_dreamcatcher_rule_opts, s); // parse the config file and put options in proper places
++
++    // statically set family to ipv4
++    rule->family = FW3_FAMILY_V4;
++
++    // do any detection of invalid rule options here
++  }
++}
++
++static void dreamcatcher_print_rule(struct fw3_ipt_handle *handle,
++    struct fw3_state *state, struct fw3_dreamcatcher_rule *rule, int num)
++{
++  struct fw3_ipt_rule *r;
++  struct fw3_dreamcatcher_info *d_info;
++  struct fw3_interface * src_int_prefix;
++  struct fw3_interface * dst_int_prefix;
++
++  // Skip if we aren't currently adding rules to the FILTER table.
++  // It would be more elegant to put this check in main.c, but that's
++  // not how the other print_XX_rules functions do it.
++  if (handle->table != FW3_TABLE_FILTER) {
++    return;
++  }
++
++  // Skip if we aren't currently adding ipv4 rules
++  if (!fw3_is_family(rule, handle->family)) {
++    return;
++  }
++
++  info("   * Dreamcatcher Rule #%u", num);
++
++  // need to create one new rule per permutation of devices (1 radio = 1 rule. 2 radios = 2-4 rules, 3 radios = 3-9 rules, and so on)
++  // example: lets say we have a rule blocking vlan 11 from 12, and wireless radios wlan0, wlan1, and wlan2 (strange to have 3 radios, but w/e)
++  // wlan0.11 --block-> wlan0.12
++  // wlan0.11 --block-> wlan1.12
++  // wlan0.11 --block-> wlan2.12
++  // wlan1.11 --block-> wlan0.12
++  // wlan1.11 --block-> wlan1.12
++  // wlan1.11 --block-> wlan2.12
++  // wlan2.11 --block-> wlan0.12
++  // wlan2.11 --block-> wlan1.12
++  // wlan2.11 --block-> wlan2.12
++  // 9 rules in total
++  list_for_each_entry(d_info, &state->dreamcatcher_infos, list) { // *d_info is now pointing to the info struct we want to use
++    fw3_foreach(src_int_prefix, &d_info->interface_prefix) {
++      // ASSUMPTION: we will never have a dreamcatcher rule with no src_vlan
++      // if no dst_vlan, then we have 1 rule per src_interface
++      if (&rule->dst_vlan == 0) {
++        r = fw3_ipt_rule_create(handle, &rule->proto, NULL, NULL, &rule->ip_src, &rule->ip_dst);
++        fw3_ipt_rule_sport_dport(r, &rule->port_src, &rule->port_dst);
++        fw3_ipt_rule_svlan(r, src_int_prefix->name, rule->src_vlan);
++        switch (rule->target) {
++          case FW3_FLAG_ACCEPT:
++            fw3_ipt_rule_target(r, "ACCEPT");
++            break;
++          case FW3_FLAG_REJECT:
++            fw3_ipt_rule_target(r, "REJECT");
++            break;
++          case FW3_FLAG_DROP:
++            fw3_ipt_rule_target(r, "DROP");
++            break;
++          default:
++            warn("   * Dreamcatcher unsupported rule target %d", rule->target);
++            break;
++        }
++        fw3_ipt_rule_append(r, "DREAMCATCHER_lan_rule");
++      } else
++      // if there is a dst_vlan, then we have N rules per src_interface, N = number of interfaces
++      {
++        fw3_foreach(dst_int_prefix, &d_info->interface_prefix) {
++          r = fw3_ipt_rule_create(handle, &rule->proto, NULL, NULL, &rule->ip_src, &rule->ip_dst);
++          fw3_ipt_rule_sport_dport(r, &rule->port_src, &rule->port_dst);
++          fw3_ipt_rule_svlan(r, src_int_prefix->name, rule->src_vlan);
++          fw3_ipt_rule_dvlan(r, dst_int_prefix->name, rule->dst_vlan);
++          switch (rule->target) {
++            case FW3_FLAG_ACCEPT:
++              fw3_ipt_rule_target(r, "ACCEPT");
++              break;
++            case FW3_FLAG_REJECT:
++              fw3_ipt_rule_target(r, "REJECT");
++              break;
++            case FW3_FLAG_DROP:
++              fw3_ipt_rule_target(r, "DROP");
++              break;
++            default:
++              warn("   * Dreamcatcher unsupported rule target %d", rule->target);
++              break;
++          }
++          fw3_ipt_rule_append(r, "DREAMCATCHER_lan_rule");
++        }
++      }
++    }
++  }
++}
++
++void fw3_print_dreamcatcher_rules(struct fw3_ipt_handle *handle, struct fw3_state *state) {
++  int num = 0;
++  struct fw3_dreamcatcher_rule *rule;
++
++  list_for_each_entry(rule, &state->dreamcatcher_rules, list) {
++    dreamcatcher_print_rule(handle, state, rule, num++);
++  }
++}
++
++void fw3_flush_dreamcatcher(struct fw3_ipt_handle *handle) {
++  char chain[32] = "DREAMCATCHER_lan_rule";
++  fw3_ipt_flush_chain(handle, chain);
++}
++
++
++
++
++
+--- /dev/null
++++ b/dreamcatcher.h
+@@ -0,0 +1,19 @@
++#ifndef __FW3_DREAMCATCHER_H
++#define __FW3_DREAMCATCHER_H
++
++#include "options.h"
++#include "iptables.h"
++
++extern const struct fw3_option fw3_dreamcatcher_rule_opts[];
++extern const struct fw3_option fw3_dreamcatcher_info_opts[];
++
++void fw3_load_dreamcatcher_info(struct fw3_state *state, struct uci_package *p);
++void fw3_load_dreamcatcher_rules(struct fw3_state *state, struct uci_package *p);
++
++//static void dreamcatcher_print_rule(struct fw3_ipt_handle *handle, struct fw3_state *state, struct fw3_dreamcatcher_rule *rule, int num); // don't declare i
++void fw3_print_dreamcatcher_rules(struct fw3_ipt_handle *handle, struct fw3_state *state);
++
++void fw3_flush_dreamcatcher(struct fw3_ipt_handle *handle);
++
++#endif // __FW3_DREAMCATCHER_H
++
+--- a/iptables.c
++++ b/iptables.c
+@@ -829,6 +829,23 @@ fw3_ipt_rule_src_dest(struct fw3_ipt_rul
+ }
+ 
+ void
++fw3_ipt_rule_svlan(struct fw3_ipt_rule *r, const char* interface_prefix, int svlan)
++{
++  char buf[16];
++  snprintf(buf, 16, "%s.%d", interface_prefix, svlan);
++  fw3_ipt_rule_addarg(r, false, "-m physdev --physdev-in", buf);
++}
++
++// must be called immediately after fw3_ipt_rule_svlan()
++void
++fw3_ipt_rule_dvlan(struct fw3_ipt_rule *r, const char* interface_prefix, int dvlan)
++{
++  char buf[16];
++  snprintf(buf, 16, "%s.%d", interface_prefix, dvlan);
++  fw3_ipt_rule_addarg(r, false, "--physdev-in", buf);
++}
++
++void
+ fw3_ipt_rule_sport_dport(struct fw3_ipt_rule *r,
+                          struct fw3_port *sp, struct fw3_port *dp)
+ {
+--- a/iptables.h
++++ b/iptables.h
+@@ -112,6 +112,10 @@ void fw3_ipt_rule_in_out(struct fw3_ipt_
+ void fw3_ipt_rule_src_dest(struct fw3_ipt_rule *r,
+                            struct fw3_address *src, struct fw3_address *dest);
+ 
++void fw3_ipt_rule_svlan(struct fw3_ipt_rule *r, const char* interface_prefix, int svlan);
++
++void fw3_ipt_rule_dvlan(struct fw3_ipt_rule *r, const char* interface_prefix, int dvlan);
++
+ void fw3_ipt_rule_sport_dport(struct fw3_ipt_rule *r,
+                               struct fw3_port *sp, struct fw3_port *dp);
+ 
+--- a/main.c
++++ b/main.c
+@@ -30,6 +30,7 @@
+ #include "includes.h"
+ #include "ubus.h"
+ #include "iptables.h"
++#include "dreamcatcher.h"
+ 
+ 
+ static enum fw3_family print_family = FW3_FAMILY_ANY;
+@@ -109,6 +110,16 @@ build_state(bool runtime)
+ 	fw3_load_forwards(state, p);
+ 	fw3_load_includes(state, p);
+ 
++  // load dreamcatcher state from another package
++  // TODO: insert file locking code
++  if (uci_load(state->uci, "dreamcatcher", &p))
++  {
++    uci_perror(state->uci, NULL);
++    error("Failed to load /etc/config/dreamcatcher");
++  }
++  fw3_load_dreamcatcher_info(state, p);
++  fw3_load_dreamcatcher_rules(state, p);
++
+ 	return true;
+ }
+ 
+@@ -279,6 +290,7 @@ start(void)
+ 			fw3_print_forwards(handle, cfg_state);
+ 			fw3_print_zone_rules(handle, cfg_state, false);
+ 			fw3_print_default_tail_rules(handle, cfg_state, false);
++      fw3_print_dreamcatcher_rules(handle, cfg_state);
+ 
+ 			if (!print_family)
+ 				fw3_ipt_commit(handle);
+@@ -374,6 +386,86 @@ start:
+ 			fw3_print_forwards(handle, cfg_state);
+ 			fw3_print_zone_rules(handle, cfg_state, true);
+ 			fw3_print_default_tail_rules(handle, cfg_state, true);
++      fw3_print_dreamcatcher_rules(handle, cfg_state);
++
++			fw3_ipt_commit(handle);
++			fw3_ipt_close(handle);
++		}
++
++		fw3_print_includes(cfg_state, family, true);
++
++		family_set(run_state, family, true);
++		family_set(cfg_state, family, true);
++
++		rv = 0;
++	}
++
++	if (!rv)
++	{
++		fw3_flush_conntrack(run_state);
++
++		fw3_set_defaults(cfg_state);
++		fw3_run_includes(cfg_state, true);
++		fw3_hotplug_zones(cfg_state, true);
++		fw3_write_statefile(cfg_state);
++	}
++
++	return rv;
++}
++
++static int
++reload_dreamcatcher(void)
++{
++	int rv = 1;
++	enum fw3_family family;
++	enum fw3_table table;
++	struct fw3_ipt_handle *handle;
++
++	if (!run_state)
++		return start();
++
++	fw3_hotplug_zones(run_state, false);
++
++	for (family = FW3_FAMILY_V4; family <= FW3_FAMILY_V6; family++)
++	{
++		if (!family_running(family))
++			goto start;
++
++		for (table = FW3_TABLE_FILTER; table <= FW3_TABLE_RAW; table++)
++		{
++			if (!fw3_has_table(family == FW3_FAMILY_V6, fw3_flag_names[table]))
++				continue;
++
++			if (!(handle = fw3_ipt_open(family, table)))
++				continue;
++
++			info(" * Clearing dreamcatcher chain in %s %s table",
++			     fw3_flag_names[family], fw3_flag_names[table]);
++
++			fw3_flush_dreamcatcher(handle);
++			fw3_ipt_commit(handle);
++			fw3_ipt_close(handle);
++		}
++
++		family_set(run_state, family, false);
++		family_set(cfg_state, family, false);
++
++start:
++		if (family == FW3_FAMILY_V6 && cfg_state->defaults.disable_ipv6)
++			continue;
++
++		for (table = FW3_TABLE_FILTER; table <= FW3_TABLE_RAW; table++)
++		{
++			if (!fw3_has_table(family == FW3_FAMILY_V6, fw3_flag_names[table]))
++				continue;
++
++			if (!(handle = fw3_ipt_open(family, table)))
++				continue;
++
++			info(" * Populating dreamcatcher chain in %s %s table",
++			     fw3_flag_names[family], fw3_flag_names[table]);
++
++      fw3_print_dreamcatcher_rules(handle, cfg_state);
+ 
+ 			fw3_ipt_commit(handle);
+ 			fw3_ipt_close(handle);
+@@ -505,6 +597,7 @@ usage(void)
+ {
+ 	fprintf(stderr, "fw3 [-4] [-6] [-q] print\n");
+ 	fprintf(stderr, "fw3 [-q] {start|stop|flush|reload|restart}\n");
++	fprintf(stderr, "fw3 [-q] reload-dreamcatcher\n");
+ 	fprintf(stderr, "fw3 [-q] network {net}\n");
+ 	fprintf(stderr, "fw3 [-q] device {dev}\n");
+ 	fprintf(stderr, "fw3 [-q] zone {zone} [dev]\n");
+@@ -620,6 +713,14 @@ int main(int argc, char **argv)
+ 			fw3_unlock();
+ 		}
+ 	}
++	else if (!strcmp(argv[optind], "reload-dreamcatcher"))
++	{
++		if (fw3_lock())
++		{
++			rv = reload_dreamcatcher();
++			fw3_unlock();
++		}
++	}
+ 	else if (!strcmp(argv[optind], "gc"))
+ 	{
+ 		if (fw3_lock())
+--- a/options.c
++++ b/options.c
+@@ -155,6 +155,25 @@ fw3_parse_int(void *ptr, const char *val
+ }
+ 
+ bool
++fw3_parse_vlan(void *ptr, const char *val, bool is_list)
++{
++	char *e;
++	int n = strtol(val, &e, 0);
++
++	if (e == val || *e)
++		return false;
++
++  // valid vlans are 1-4094
++  if (n > 4094 || n < 1) {
++    return false;
++  }
++
++	*((int *)ptr) = n;
++
++	return true;
++}
++
++bool
+ fw3_parse_string(void *ptr, const char *val, bool is_list)
+ {
+ 	*((char **)ptr) = (char *)val;
+@@ -162,6 +181,15 @@ fw3_parse_string(void *ptr, const char *
+ }
+ 
+ bool
++fw3_parse_interface(void *ptr, const char *val, bool is_list)
++{
++  struct fw3_interface iface = { };
++  iface.name = strdup(val);
++	put_value(ptr, &iface, sizeof(iface), is_list);
++  return true;
++}
++
++bool
+ fw3_parse_target(void *ptr, const char *val, bool is_list)
+ {
+ 	return parse_enum(ptr, val, &fw3_flag_names[FW3_FLAG_ACCEPT],
+--- a/options.h
++++ b/options.h
+@@ -167,6 +167,13 @@ struct fw3_device
+ 	char network[32];
+ };
+ 
++struct fw3_interface
++{
++  struct list_head list;
++
++  const char* name;
++};
++
+ struct fw3_address
+ {
+ 	struct list_head list;
+@@ -364,6 +371,31 @@ struct fw3_rule
+ 	const char *extra;
+ };
+ 
++struct fw3_dreamcatcher_rule
++{
++	struct list_head list;
++
++	enum fw3_family family; // always set to ipv4
++
++	int title;
++	int src_vlan;
++	int dst_vlan;
++	struct fw3_protocol proto;
++	struct fw3_address ip_src;
++	struct fw3_address ip_dst;
++	struct fw3_port port_src;
++	struct fw3_port port_dst;
++	enum fw3_flag target;
++  // default option approved 0
++};
++
++struct fw3_dreamcatcher_info
++{
++  struct list_head list;
++
++  struct list_head interface_prefix;
++};
++
+ struct fw3_redirect
+ {
+ 	struct list_head list;
+@@ -502,6 +534,8 @@ struct fw3_state
+ 	struct fw3_defaults defaults;
+ 	struct list_head zones;
+ 	struct list_head rules;
++	struct list_head dreamcatcher_rules;
++  struct list_head dreamcatcher_infos;
+ 	struct list_head redirects;
+ 	struct list_head snats;
+ 	struct list_head forwards;
+@@ -537,7 +571,9 @@ struct fw3_option
+ 
+ bool fw3_parse_bool(void *ptr, const char *val, bool is_list);
+ bool fw3_parse_int(void *ptr, const char *val, bool is_list);
++bool fw3_parse_vlan(void *ptr, const char *val, bool is_list);
+ bool fw3_parse_string(void *ptr, const char *val, bool is_list);
++bool fw3_parse_interface(void *ptr, const char *val, bool is_list);
+ bool fw3_parse_target(void *ptr, const char *val, bool is_list);
+ bool fw3_parse_limit(void *ptr, const char *val, bool is_list);
+ bool fw3_parse_device(void *ptr, const char *val, bool is_list);
+--- a/zones.c
++++ b/zones.c
+@@ -220,8 +220,8 @@ fw3_load_zones(struct fw3_state *state,
+ 
+ 		if (zone->dreamcatcher)
+ 		{
+-			setbit(zone->flags[0], FW3_FLAG_DREAMCATCHER);
+-			setbit(zone->flags[1], FW3_FLAG_DREAMCATCHER);
++			setbit(zone->flags[0], FW3_FLAG_DREAMCATCHER); // ipv4
++			setbit(zone->flags[1], FW3_FLAG_DREAMCATCHER); // ipv6
+ 		}
+ 
+ 		if (zone->masq)
