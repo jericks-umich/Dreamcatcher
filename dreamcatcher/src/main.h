@@ -22,7 +22,7 @@ void print_ipv4(struct ip* i);
 void print_ipv6(struct ip6_hdr* i);
 unsigned int get_src_vlan(struct nfq_data *tb);
 unsigned int get_dst_vlan(struct nfq_data *tb);
-void add_temp_rule(struct nfq_data *tb);
+void add_rule(struct nfq_data *tb);
 void print_pkt (struct nfq_data *tb);
 void reload_firewall();
 int cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struct nfq_data *nfa, void *data);

@@ -166,7 +166,7 @@ unsigned int get_dst_vlan(struct nfq_data *tb) {
   return (unsigned int) strtol(vlan_ptr, NULL, 10); // returns 0 if unable to convert to integer
 }
 
-void add_temp_rule(struct nfq_data *tb) {
+void add_rule(struct nfq_data *tb) {
 	int ret;
 	protocol proto = 0;
 	unsigned char *data;
@@ -176,7 +176,7 @@ void add_temp_rule(struct nfq_data *tb) {
 	struct udphdr* udp;
 	struct icmphdr* icmp;
   
-  temp_rule new_rule;
+  rule new_rule;
   memset(&new_rule, 0, sizeof(new_rule)); // zero out all fields
 
   /////////////
@@ -366,7 +366,7 @@ int cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struct nfq_data *nfa, vo
   ret = nfq_set_verdict(qh, id, NF_ACCEPT, 0, NULL);
   LOGD("Set ACCEPT verdict. Return value: %d", ret);
   print_pkt(nfa);
-  add_temp_rule(nfa);
+  add_rule(nfa);
   reload_firewall();
   return ret;
 }
