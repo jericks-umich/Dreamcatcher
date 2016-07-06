@@ -4,6 +4,7 @@
 #include <string.h>
 #include <errno.h>
 
+#include <pthread.h>
 #include <netinet/in.h>
 #include <linux/types.h>
 #include <linux/netfilter.h>            /* for NF_ACCEPT */
@@ -20,6 +21,7 @@
 #include <protocols.h>
 #include <config.h>
 #include <logger.h>
+#include <conductor.h>
 
 #define TAG "MAIN"
 
@@ -383,11 +385,15 @@ int main(int argc, char **argv)
 	int fd;
 	int rv;
 	char buf[4096] __attribute__ ((aligned));
+  pthread_t conductor_thread;
 
   // clear out any previous temporary rules -- we don't have state for them anymore -- need to recreate them if we want them again
-  clean_config();
+  //clean_config();
   // reload firewall
-  reload_firewall();
+  //reload_firewall();
+
+  // create new thread for conducting new rules to google/client application
+  rv = pthread_create(&conductor_thread, NULL, conduct, NULL);
 
   // create handle to nfqueue and watch for new packets to handle
 	LOGV("opening library handle");
@@ -427,6 +433,9 @@ int main(int argc, char **argv)
 	nfq_destroy_queue(qh);
 	LOGV("closing library handle");
 	nfq_close(h);
+
+  // TODO: do some signal handling to detect early close
+  pthread_cancel(conductor_thread);
 
 	exit(0);
 }
