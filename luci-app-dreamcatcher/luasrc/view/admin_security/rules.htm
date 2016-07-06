@@ -1,0 +1,68 @@
+<%+header%>
+
+<h1><a id="title1" name="title1"><%:Rules Page%></a></h1>
+<div> This page shows the rules for dreamcatcher.</div>
+<h2><a id="title2" name="title2"><%:Permanent Rules%></a></h2>     
+<br>
+<pre>
+<%=permanent%>
+</pre>
+<h2><a id="title2" name="title2"><%:Temp Rules%></a></h2>
+<br>
+<pre>
+<%=temp%>
+</pre>
+<h2><a id="title3" name="title3"><%:Add new rules%></a></h2>
+<form style="margin:0px" id="add" action="" method="post">
+	<table style="width:100%">
+	<tr>
+		<td>Source vlan</td>
+                <td>Destination vlan</td>                                                                                            
+                <td>Protocol</td>                                                                                                    
+                <td>Source IP</td>                                                                                                   
+        	<td>Title</td>
+		<td></td>
+	</tr>
+	<tr>
+		<td><input style="width:120px" type="text" name="src_vlan" id="src_vlan"></input></td>                             
+                <td><input style="width:120px" type="text" name="dst_vlan" id="dst_vlan"></input></td>                        
+                <td><input style="width:120px" type="text" name="proto" id="proto"></input></td>                                   
+                <td><input style="width:120px" type="text" name="src_ip" id="src_ip"></input></td> 
+	        <td><input style="width:120px" type="text" name="title" id="title"></input></td>        
+	        <td><input type="button" onclick="add_perm_rule()" value="Add to perm rule"></td>                                                
+	</tr>
+	<tr>
+		<td>Destination IP</td>                                                                                              
+                <td>Source port</td>                                                                                                 
+                <td>Destination port</td>                                                                                            
+                <td>Verdict</td>                                                                                                     
+		<td></td>
+		<td></td>
+	</tr>
+	<tr>
+                <td><input style="width:120px" type="text" name="dst_ip" id="dst_ip"></input></td>    
+                <td><input style="width:120px" type="text" name="src_port" id="src_port"></input></td>     
+                <td><input style="width:120px" type="text" name="dst_port" id="dst_port"></input></td>
+                <td><input style="width:120px" type="text" name="verdict" id="verdict"></input></td>          
+		<td></td>
+		<td><input type="button" onclick="add_temp_rule()" value="Add to temp rule"></td>
+	</tr>
+	</table>
+	<input id="rule_type" type="hidden" name="rule_type" value="test"></input>
+</form>
+<script>
+function add_perm_rule(){
+        document.getElementById("rule_type").value="perm";                                                                           
+        document.getElementById("add").submit();                                                                                
+}    
+
+function add_temp_rule(){
+	document.getElementById("rule_type").value="temp";
+	document.getElementById("add").submit();
+}
+
+function modify_rule(IcName,method){
+	document.getElementById(IcName.concat(method)).submit();
+}
+</script>
+<%+footer%>
