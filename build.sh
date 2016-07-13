@@ -100,9 +100,12 @@ popd
 
 #### MESSAGES FOR USER ####
 if [ "$_status" == "0" ] ; then
-	image_path=$OPENWRT_DIR/openwrt/bin/ar71xx/openwrt-ar71xx-generic-tl-wdr4300-v1-squashfs-factory.bin
+	image_path=$OPENWRT_DIR/bin/ar71xx/openwrt-ar71xx-generic-tl-wdr4300-v1-squashfs-factory.bin
 	echo "Build complete. You can find your image at $image_path."
-	echo "After flashing, put CA at /root/CA/ and freeradius2 at /etc/freeradius2/ ."
+	sum=`md5sum $image_path | cut -f 1 -d " "`
+	echo "The md5sum of your image is $sum."
+	echo "After flashing, put CA at /root/CA/ and freeradius2 at /etc/freeradius2/"
+	echo "and follow the other directions in the README file"
 fi
 
 
