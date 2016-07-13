@@ -58,9 +58,8 @@ rm $OPENWRT_DIR/package/network/utils/dreamcatcher 2>/dev/null
 ln -s $DREAMCATCHER_DIR $OPENWRT_DIR/package/network/utils/dreamcatcher
 
 # add luci-app-dreamcatcher package
-# don't build while still under development
-#rm $OPENWRT_DIR/package/feeds/luci/luci-app-dreamcatcher 2>/dev/null
-#ln -s $LUCI_APP_DREAMCATCHER_DIR $OPENWRT_DIR/package/feeds/luci/luci-app-dreamcatcher
+rm $OPENWRT_DIR/package/feeds/luci/luci-app-dreamcatcher 2>/dev/null
+ln -s $LUCI_APP_DREAMCATCHER_DIR $OPENWRT_DIR/package/feeds/luci/luci-app-dreamcatcher
 
 #### CONFIG ####
 # use our config file diff with everything we need in it
