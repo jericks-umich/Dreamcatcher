@@ -24,7 +24,7 @@
 +  FW3_OPT("dst_ip",              address,   dreamcatcher_rule,     ip_dst),
 +  FW3_OPT("src_port",            port,      dreamcatcher_rule,     port_src),
 +  FW3_OPT("dst_port",            port,      dreamcatcher_rule,     port_dst),
-+  FW3_OPT("target",              target,    dreamcatcher_rule,     target),
++  FW3_OPT("verdict",             target,    dreamcatcher_rule,     target),
 +
 +  { }
 +};
@@ -146,7 +146,7 @@
 +            break;
 +          default:
 +            warn("   * Dreamcatcher unsupported rule target %d", rule->target);
-+            break;
++            return;
 +        }
 +        fw3_ipt_rule_append(r, "DREAMCATCHER_lan_rule");
 +      } else
@@ -168,7 +168,7 @@
 +              break;
 +            default:
 +              warn("   * Dreamcatcher unsupported rule target %d", rule->target);
-+              break;
++              return;
 +          }
 +          fw3_ipt_rule_append(r, "DREAMCATCHER_lan_rule");
 +        }
