@@ -12,7 +12,7 @@ define Package/dreamcatcher
 	CATEGORY:=Network
 	SUBMENU:=Firewall
 	TITLE:=Dreamcatcher intra-network filter
-	DEPENDS:=-wpad-mini +wpad +libnetfilter-queue +iptables-mod-nfqueue +kmod-ipt-nfqueue +iptables-mod-extra +kmod_ipt-extra +kmod-nfnetlink +kmod-nfnetlink-queue +libuci +freeradius2 +FREERADIUS_OPENSSL +freeradius2-common +freeradius2-mod-chap +freeradius2-mod-detail +freeradius2-mod-eap +freeradius2-mod-eap-mschapv2 +freeradius2-mod-eap-peap +freeradius2-mod-eap-tls +freeradius2-mod-eap-ttls +freeradius2-mod-exec +freeradius2-mod-files +freeradius2-mod-mschap +freeradius2-mod-pap +freeradius2-mod-passwd +freeradius2-mod-preprocess +freeradius2-mod-radutmp +freeradius2-utils
+	DEPENDS:=+wpad +libnetfilter-queue +iptables-mod-nfqueue +kmod-ipt-nfqueue +iptables-mod-extra +kmod_ipt-extra +kmod-nfnetlink +kmod-nfnetlink-queue +libuci +freeradius2 +FREERADIUS_OPENSSL +freeradius2-common +freeradius2-mod-chap +freeradius2-mod-detail +freeradius2-mod-eap +freeradius2-mod-eap-mschapv2 +freeradius2-mod-eap-peap +freeradius2-mod-eap-tls +freeradius2-mod-eap-ttls +freeradius2-mod-exec +freeradius2-mod-files +freeradius2-mod-mschap +freeradius2-mod-pap +freeradius2-mod-passwd +freeradius2-mod-preprocess +freeradius2-mod-radutmp +freeradius2-utils
 endef
 
 define Package/bridge/description
@@ -31,7 +31,8 @@ define Build/Compile
 		$(PKG_BUILD_DIR)/main.c \
 		$(PKG_BUILD_DIR)/config.c \
 		$(PKG_BUILD_DIR)/logger.c \
-		$(PKG_BUILD_DIR)/protocols.c
+		$(PKG_BUILD_DIR)/protocols.c \
+		$(PKG_BUILD_DIR)/conductor.c
 endef
 
 define Package/dreamcatcher/install
