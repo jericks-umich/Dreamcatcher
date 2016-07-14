@@ -1,0 +1,34 @@
+--- a/zones.c
++++ b/zones.c
+@@ -221,7 +221,7 @@ fw3_load_zones(struct fw3_state *state,
+ 		if (zone->dreamcatcher)
+ 		{
+ 			setbit(zone->flags[0], FW3_FLAG_DREAMCATCHER); // ipv4
+-			setbit(zone->flags[1], FW3_FLAG_DREAMCATCHER); // ipv6
++			//setbit(zone->flags[1], FW3_FLAG_DREAMCATCHER); // ipv6
+ 		}
+ 
+ 		if (zone->masq)
+@@ -499,13 +499,21 @@ print_zone_rule(struct fw3_ipt_handle *h
+ 			fw3_ipt_rule_append(r, "zone_%s_forward", zone->name);
+ 		}
+ 
+-		// this should go here specifically, after all the other firewall rules but before the default rule
++		// these should go here specifically, after all the other firewall forwarding rules but before the default rule
+ 		if (has(zone->flags, handle->family, FW3_FLAG_DREAMCATCHER))
+ 		{
++      // First rule sends packets to DREAMCATCHER_lan_rule chain
+ 			r = fw3_ipt_rule_new(handle);
+ 			fw3_ipt_rule_comment(r, "DREAMCATCHER chain");
+ 			fw3_ipt_rule_target(r, "DREAMCATCHER_%s_rule", zone->name);
+ 			fw3_ipt_rule_append(r, "zone_%s_forward", zone->name);
++      // Second rule sends packets to NFQUEUE if they didn't match any existing rules
++      r = fw3_ipt_rule_new(handle);
++      fw3_ipt_rule_comment(r,"Default DREAMCATCHER -> NFQUEUE");
++      fw3_ipt_rule_target(r, "NFQUEUE");
++      fw3_ipt_rule_addarg(r, NULL, "--queue-num", "4670"); // TODO: make the queue number configurable
++      fw3_ipt_rule_addarg(r, NULL, "--queue-bypass", NULL);
++      fw3_ipt_rule_append(r, "zone_%s_forward", zone->name);
+ 		}
+ 
+ 		r = fw3_ipt_rule_new(handle);
