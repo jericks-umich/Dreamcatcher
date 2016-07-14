@@ -11,7 +11,7 @@
  SET(CMAKE_INSTALL_PREFIX /usr)
 --- /dev/null
 +++ b/dreamcatcher.c
-@@ -0,0 +1,182 @@
+@@ -0,0 +1,183 @@
 +#include "dreamcatcher.h"
 +
 +const struct fw3_option fw3_dreamcatcher_rule_opts[] = {
@@ -24,7 +24,7 @@
 +  FW3_OPT("dst_ip",              address,   dreamcatcher_rule,     ip_dst),
 +  FW3_OPT("src_port",            port,      dreamcatcher_rule,     port_src),
 +  FW3_OPT("dst_port",            port,      dreamcatcher_rule,     port_dst),
-+  FW3_OPT("target",              target,    dreamcatcher_rule,     target),
++  FW3_OPT("verdict",             target,    dreamcatcher_rule,     target),
 +
 +  { }
 +};
@@ -42,7 +42,7 @@
 +
 +  INIT_LIST_HEAD(&state->dreamcatcher_infos);
 +
-+	uci_foreach_element(&p->sections, e) {
++  uci_foreach_element(&p->sections, e) {
 +    s = uci_to_section(e);
 +
 +    if (strcmp(s->type, "info")) { // if not an "info" section
@@ -53,7 +53,9 @@
 +    if (!info) {
 +      continue;
 +    }
-+		list_add_tail(&info->list, &state->dreamcatcher_infos); // add info to list of dreamcatcher infos
++    INIT_LIST_HEAD(&info->interface_prefix); // initialize list struct inside dreamcatcher info
++
++    list_add_tail(&info->list, &state->dreamcatcher_infos); // add info to list of dreamcatcher infos
 +
 +    fw3_parse_options(info, fw3_dreamcatcher_info_opts, s); // parse the config file and put options in proper places
 +
@@ -144,7 +146,7 @@
 +            break;
 +          default:
 +            warn("   * Dreamcatcher unsupported rule target %d", rule->target);
-+            break;
++            return;
 +        }
 +        fw3_ipt_rule_append(r, "DREAMCATCHER_lan_rule");
 +      } else
@@ -153,8 +155,7 @@
 +        fw3_foreach(dst_int_prefix, &d_info->interface_prefix) {
 +          r = fw3_ipt_rule_create(handle, &rule->proto, NULL, NULL, &rule->ip_src, &rule->ip_dst);
 +          fw3_ipt_rule_sport_dport(r, &rule->port_src, &rule->port_dst);
-+          fw3_ipt_rule_svlan(r, src_int_prefix->name, rule->src_vlan);
-+          fw3_ipt_rule_dvlan(r, dst_int_prefix->name, rule->dst_vlan);
++          fw3_ipt_rule_sdvlan(r, src_int_prefix->name, rule->src_vlan, rule->dst_vlan);
 +          switch (rule->target) {
 +            case FW3_FLAG_ACCEPT:
 +              fw3_ipt_rule_target(r, "ACCEPT");
@@ -167,7 +168,7 @@
 +              break;
 +            default:
 +              warn("   * Dreamcatcher unsupported rule target %d", rule->target);
-+              break;
++              return;
 +          }
 +          fw3_ipt_rule_append(r, "DREAMCATCHER_lan_rule");
 +        }
@@ -218,24 +219,27 @@
 +
 --- a/iptables.c
 +++ b/iptables.c
-@@ -829,6 +829,23 @@ fw3_ipt_rule_src_dest(struct fw3_ipt_rul
+@@ -829,6 +829,26 @@ fw3_ipt_rule_src_dest(struct fw3_ipt_rul
  }
  
  void
 +fw3_ipt_rule_svlan(struct fw3_ipt_rule *r, const char* interface_prefix, int svlan)
 +{
 +  char buf[16];
++  fw3_ipt_rule_addarg(r, false, "-m", "physdev");
 +  snprintf(buf, 16, "%s.%d", interface_prefix, svlan);
-+  fw3_ipt_rule_addarg(r, false, "-m physdev --physdev-in", buf);
++  fw3_ipt_rule_addarg(r, false, "--physdev-in", buf);
 +}
 +
-+// must be called immediately after fw3_ipt_rule_svlan()
 +void
-+fw3_ipt_rule_dvlan(struct fw3_ipt_rule *r, const char* interface_prefix, int dvlan)
++fw3_ipt_rule_sdvlan(struct fw3_ipt_rule *r, const char* interface_prefix, int svlan, int dvlan)
 +{
 +  char buf[16];
-+  snprintf(buf, 16, "%s.%d", interface_prefix, dvlan);
++  fw3_ipt_rule_addarg(r, false, "-m", "physdev");
++  snprintf(buf, 16, "%s.%d", interface_prefix, svlan);
 +  fw3_ipt_rule_addarg(r, false, "--physdev-in", buf);
++  snprintf(buf, 16, "%s.%d", interface_prefix, dvlan);
++  fw3_ipt_rule_addarg(r, false, "--physdev-out", buf);
 +}
 +
 +void
@@ -250,7 +254,7 @@
  
 +void fw3_ipt_rule_svlan(struct fw3_ipt_rule *r, const char* interface_prefix, int svlan);
 +
-+void fw3_ipt_rule_dvlan(struct fw3_ipt_rule *r, const char* interface_prefix, int dvlan);
++void fw3_ipt_rule_sdvlan(struct fw3_ipt_rule *r, const char* interface_prefix, int svlan, int dvlan);
 +
  void fw3_ipt_rule_sport_dport(struct fw3_ipt_rule *r,
                                struct fw3_port *sp, struct fw3_port *dp);
