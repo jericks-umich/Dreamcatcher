@@ -6,9 +6,9 @@
 include $(TOPDIR)/rules.mk
 
 LUCI_TITLE:=LuCI support for Dreamcatcher
-LUCI_DEPENDS:=dreamcatcher
+LUCI_DEPENDS:=+dreamcatcher +luci-app-json
 LUCI_PKGARCH:=all
 
-include ../../luci.mk
+include ../openwrt/feeds/luci/luci.mk
 
 # call BuildPackage - OpenWrt buildroot signature

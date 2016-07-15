@@ -26,6 +26,18 @@ Use scp to copy freeradius2/ to /etc/freeradius2/ on the router, and CA/ to
 /root/CA/ on the router.
 Then, restart the RADIUS server with `/etc/init.d/radiusd restart`.
 
+You will need to enable iptables to use the physdev module by changing
+'net.bridge.bridge-nf-call-iptables=0' to '=1' in /etc/sysctl.conf.
+
+You will need to edit /etc/config/firewall and add
+'option DREAMCATCHER 1'
+to the 'lan' zone to enable dreamcatcher support on your LAN.
+
+You will need to configure the wireless networks. We have provided a sample
+configuration at config/wireless that should be copied to /etc/config/wireless
+on the router. This creates a test network named "TEST NETWORK DO NOT USE"
+that connects to the radius server configured in /etc/freeradius2/.
+
 In a future commit, we will want to automate this configuration and generate
 new certificates, etc. during the install.
 

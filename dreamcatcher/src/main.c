@@ -240,11 +240,19 @@ void add_rule(struct nfq_data *tb) {
 		default :
 			LOGD("Unknown protocol %hhu. Not handled.", proto);
 	}
+  new_rule.target = REJECT;
 
-  new_rule.target = DROP;
+  // logic to determine type of packet and how we want to handle it
+  // TODO
+  // default title type = 0
+  new_rule.title = 0; // %s wants to communicate with %s
+  set_message(&new_rule);
 
   // write the rule to the config file
-  write_rule(new_rule);
+  write_rule(&new_rule);
+
+  // pass the new rule to conductor
+  // TODO
 
 	return;
 }
@@ -374,7 +382,12 @@ int cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struct nfq_data *nfa, vo
 }
 
 void reload_firewall() {
-  // TODO: invoke firewall3 binary to reload the iptables config, including the updated dreamcatcher config file
+  int ret;
+  printf("Reloading the firewall.\n");
+  ret = system("/sbin/fw3 reload-dreamcatcher");
+  if (ret != 0) {
+    printf("Error in reloading the firewall: %d", ret);
+  }
 }
 
 int main(int argc, char **argv)
@@ -393,7 +406,7 @@ int main(int argc, char **argv)
   //reload_firewall();
 
   // create new thread for conducting new rules to google/client application
-  rv = pthread_create(&conductor_thread, NULL, conduct, NULL);
+  rv = pthread_create(&conductor_thread, NULL, &conduct, NULL);
 
   // create handle to nfqueue and watch for new packets to handle
 	LOGV("opening library handle");

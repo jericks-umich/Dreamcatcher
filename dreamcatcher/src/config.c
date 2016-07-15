@@ -4,6 +4,8 @@
 #include <unistd.h>
 #include <fcntl.h>
 
+#include <openssl/md5.h>
+
 #include <uci.h>
 
 #include <main.h>
@@ -16,6 +18,26 @@
 #define CONFIG_FILE "/etc/config/dreamcatcher"
 
 #define MAX_TRIES 3
+
+void set_message(rule* r) {
+  switch (r->title) {
+    case (DIRECT):
+      snprintf(r->message, sizeof(r->message), "%d wants to send messages to %d", r->src_vlan, r->dst_vlan);
+      break;
+    case (DISCOVER):
+      snprintf(r->message, sizeof(r->message), "%d wants to discover devices on your network", r->src_vlan);
+      break;
+    case (ADVERTISE):
+      snprintf(r->message, sizeof(r->message), "%d wants to tell other devices on your network about itself", r->src_vlan);
+      break;
+    case (BROADCAST):
+      snprintf(r->message, sizeof(r->message), "%d wants to broadcast messages to your network", r->src_vlan);
+      break;
+    default:
+      snprintf(r->message, sizeof(r->message), "Someone's trying to talk to someone. Please use advanced mode to view the specific details.");
+      break;
+  }
+}
 
 void print_uci_ptr(struct uci_ptr* p) {
   LOGV("uci_ptr package = %s",p->package);
@@ -40,16 +62,52 @@ char* get_verdict_string(verdict v) {
   return NULL;
 }
 
+// takes as input a rule
+// generates as output a hash, which is written to the pointer supplied as the first argument
+void hash_rule(rule* r) {
+  MD5_CTX c;
+  unsigned char hash_bytes[MD5_DIGEST_LENGTH];
+  char hash_string[512] = "\0";
+  // create string to be hashed
+  // required
+  snprintf(hash_string, sizeof(hash_string)-1, "%stitle%d",    hash_string, r->title);
+  if (r->src_vlan != 0) {
+    snprintf(hash_string, sizeof(hash_string)-1, "%ssrc_vlan%d", hash_string, r->src_vlan);
+  }
+  if (r->dst_vlan != 0) {
+    snprintf(hash_string, sizeof(hash_string)-1, "%sdst_vlan%d", hash_string, r->dst_vlan);
+  }
+  // required
+  snprintf(hash_string, sizeof(hash_string)-1, "%sproto%s",    hash_string, get_protocol_string(r->proto));
+  if (strncmp(r->src_ip, "\0", sizeof(r->src_ip)) != 0) {
+    snprintf(hash_string, sizeof(hash_string)-1, "%ssrc_ip%s",   hash_string, r->src_ip);
+  }
+  if (strncmp(r->dst_ip, "\0", sizeof(r->dst_ip)) != 0) {
+    snprintf(hash_string, sizeof(hash_string)-1, "%sdst_ip%s",   hash_string, r->dst_ip);
+  }
+  if (r->src_port != 0) {
+    snprintf(hash_string, sizeof(hash_string)-1, "%ssrc_port%d", hash_string, r->src_port);
+  }
+  if (r->src_port != 0) {
+    snprintf(hash_string, sizeof(hash_string)-1, "%sdst_port%d", hash_string, r->dst_port);
+  }
+  // take MD5 hash
+  MD5(hash_string, strlen(hash_string), hash_bytes);
+  // convert hash_bytes into hex
+  for (int i=0; i<sizeof(hash_bytes); i++) { // iterate over hash_bytes and append them in hex to r->hash
+    snprintf(r->hash, sizeof(r->hash), "%s%02x", r->hash, hash_bytes[i]);
+  }
+}
+  
 // input: the rule to be written to config file
 // return: 0 on success, -1 on failure
-int write_rule(rule r) {
+int write_rule(rule* r) {
   int fd;
   int ret;
   int tries = 0;
 
   struct uci_context* ctx;
   struct uci_package* pkg;
-  struct uci_section* rule_section;
 
   // lock the config file
   LOGV("Locking config file");
@@ -64,15 +122,16 @@ int write_rule(rule r) {
 
   // print out the rule to be written
   LOGV("New rule:");
-  LOGV("src_vlan: %u", r.src_vlan);
-  LOGV("dst_vlan: %u", r.dst_vlan);
-  LOGV("protonum: %u", r.proto);
-  LOGV("protocol: %s", get_protocol_string(r.proto));
-  LOGV("src_ip:   %s", r.src_ip);
-  LOGV("dst_ip:   %s", r.dst_ip);
-  LOGV("src_port: %u", r.src_port);
-  LOGV("dst_port: %u", r.dst_port);
-  LOGV("target:   %d", r.target);
+  LOGV("title:    %u", r->title);
+  LOGV("src_vlan: %u", r->src_vlan);
+  LOGV("dst_vlan: %u", r->dst_vlan);
+  LOGV("protonum: %u", r->proto);
+  LOGV("protocol: %s", get_protocol_string(r->proto));
+  LOGV("src_ip:   %s", r->src_ip);
+  LOGV("dst_ip:   %s", r->dst_ip);
+  LOGV("src_port: %u", r->src_port);
+  LOGV("dst_port: %u", r->dst_port);
+  LOGV("target:   %d", r->target);
 
   // write the rule out to the config file
   // initialize
@@ -86,33 +145,34 @@ int write_rule(rule r) {
     LOGW("Didn't properly load config file");
     uci_perror(ctx,""); // TODO: replace this with uci_get_errorstr() and use our own logging functions
   }
+  // calculate hash of rule for its id
+  hash_rule(r); // now r->hash stores the unique id for this rule
   // create new entry/section
-  ret = uci_add_section(ctx, pkg, "rule", &rule_section); // rule_section now points at the new rule
-  if (ret != UCI_OK) {
-    LOGW("Didn't properly add new section");
-    uci_perror(ctx,""); // TODO: replace this with uci_get_errorstr() and use our own logging functions
-  }
+  add_new_named_rule_section(ctx, r->hash);
   // populate section
-  if (r.src_vlan != 0) {
-    rule_uci_set_int(ctx, "src", r.src_vlan);
+  rule_uci_set_str(ctx, r->hash, "message", r->message); // required
+  rule_uci_set_int(ctx, r->hash, "title", r->title); // required
+  if (r->src_vlan != 0) { // optional
+    rule_uci_set_int(ctx, r->hash, "src_vlan", r->src_vlan);
   }
-  if (r.dst_vlan != 0) {
-    rule_uci_set_int(ctx, "dst", r.dst_vlan);
+  if (r->dst_vlan != 0) { // optional
+    rule_uci_set_int(ctx, r->hash, "dst_vlan", r->dst_vlan);
   }
-  rule_uci_set_str(ctx, "proto", get_protocol_string(r.proto));
-  if (strncmp(r.src_ip, "\0", sizeof(r.src_ip)) != 0) {
-    rule_uci_set_str(ctx, "src_ip", r.src_ip);
+  rule_uci_set_str(ctx, r->hash, "proto", get_protocol_string(r->proto)); // required
+  if (strncmp(r->src_ip, "\0", sizeof(r->src_ip)) != 0) { // optional
+    rule_uci_set_str(ctx, r->hash, "src_ip", r->src_ip);
   }
-  if (strncmp(r.dst_ip, "\0", sizeof(r.dst_ip)) != 0) {
-    rule_uci_set_str(ctx, "dst_ip", r.dst_ip);
+  if (strncmp(r->dst_ip, "\0", sizeof(r->dst_ip)) != 0) { // optional
+    rule_uci_set_str(ctx, r->hash, "dst_ip", r->dst_ip);
   }
-  if (r.src_port != 0) {
-    rule_uci_set_int(ctx, "src_port", r.src_port);
+  if (r->src_port != 0) { // optional
+    rule_uci_set_int(ctx, r->hash, "src_port", r->src_port);
   }
-  if (r.dst_port != 0) {
-    rule_uci_set_int(ctx, "dst_port", r.dst_port);
+  if (r->dst_port != 0) { // optional
+    rule_uci_set_int(ctx, r->hash, "dst_port", r->dst_port);
   }
-  rule_uci_set_str(ctx, "verdict", get_verdict_string(r.target));
+  rule_uci_set_str(ctx, r->hash, "verdict", get_verdict_string(r->target)); // required
+  rule_uci_set_int(ctx, r->hash, "approved", 0); // required, always set to 0 because the user has not approved it yet
 
   // save and commit changes
   LOGV("Saving changes to config file");
@@ -141,33 +201,37 @@ int write_rule(rule r) {
   }
 }
 
-void rule_uci_set_int(struct uci_context *ctx, const char* option, const unsigned int value) {
+void add_new_named_rule_section(struct uci_context *ctx, const char* hash) {
   struct uci_ptr ptr;
-  char* ptr_string;
-  ptr_string = malloc(128);
-  sprintf(ptr_string, "dreamcatcher.@rule[-1].%s=%d", option, value);
-  uci_lookup_ptr(ctx, &ptr, ptr_string, true);
+  char ptr_string[128];
+  snprintf(ptr_string, sizeof(ptr_string), "dreamcatcher.%s=rule", hash);
+  uci_lookup_ptr(ctx, &ptr, ptr_string, false);
   uci_set(ctx, &ptr);
-  free(ptr_string);
 }
 
-void rule_uci_set_str(struct uci_context *ctx, const char* option, const char* value) {
+void rule_uci_set_int(struct uci_context *ctx, const char* hash, const char* option, const unsigned int value) {
   struct uci_ptr ptr;
-  char* ptr_string;
-  ptr_string = malloc(128);
-  sprintf(ptr_string, "dreamcatcher.@rule[-1].%s=%s", option, value);
-  uci_lookup_ptr(ctx, &ptr, ptr_string, true);
+  char ptr_string[128];
+  sprintf(ptr_string, "dreamcatcher.%s.%s=%d", hash, option, value);
+  uci_lookup_ptr(ctx, &ptr, ptr_string, false);
   uci_set(ctx, &ptr);
-  free(ptr_string);
 }
 
+void rule_uci_set_str(struct uci_context *ctx, const char* hash, const char* option, const char* value) {
+  struct uci_ptr ptr;
+  char ptr_string[128];
+  sprintf(ptr_string, "dreamcatcher.%s.%s=%s", hash, option, value);
+  uci_lookup_ptr(ctx, &ptr, ptr_string, false);
+  uci_set(ctx, &ptr);
+}
+
+// this function is usused now, leaving for now but can probably be removed
 void clean_config() {
   int ret;
   int fd;
   int tries = 0;
   struct uci_context* ctx;
   struct uci_package* pkg;
-  struct uci_section* rule_section;
   struct uci_element* rule_ptr;
   struct uci_ptr ptr;
   char* ptr_string;

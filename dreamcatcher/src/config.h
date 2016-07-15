@@ -49,6 +49,8 @@ typedef enum {
 } message_type;
 
 typedef struct rule {
+  char hash[33]; // 32 hex chars plus '\0'
+  char message[128];
   message_type title;
   unsigned int src_vlan;
   unsigned int dst_vlan;
@@ -62,14 +64,17 @@ typedef struct rule {
   // meaning the rule has not been approved by the user yet
 } rule;
 
+void set_message(rule* r);
 char* get_verdict_string(verdict v);
+void hash_rule(rule* r);
 void print_uci_ptr(struct uci_ptr* p);
-int write_rule(rule r);
+int write_rule(rule* r);
 void clean_config();
 int lock_open_config();
 int unlock_close_config();
-void rule_uci_set_int(struct uci_context *ctx, const char* option, const unsigned int value);
-void rule_uci_set_str(struct uci_context *ctx, const char* option, const char* value);
+void add_new_named_rule_section(struct uci_context *ctx, const char* hash);
+void rule_uci_set_int(struct uci_context *ctx, const char* hash, const char* option, const unsigned int value);
+void rule_uci_set_str(struct uci_context *ctx, const char* hash, const char* option, const char* value);
 
 
 #endif // DREAMCATCHER_CONFIG_H
