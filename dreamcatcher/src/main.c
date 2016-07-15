@@ -252,7 +252,7 @@ void add_rule(struct nfq_data *tb) {
   write_rule(&new_rule);
 
   // pass the new rule to conductor
-  // TODO
+  push_rule_to_queue(&new_rule);
 
 	return;
 }
