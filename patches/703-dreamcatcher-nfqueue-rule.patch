@@ -9,7 +9,7 @@
  		}
  
  		if (zone->masq)
-@@ -499,13 +499,21 @@ print_zone_rule(struct fw3_ipt_handle *h
+@@ -499,13 +499,20 @@ print_zone_rule(struct fw3_ipt_handle *h
  			fw3_ipt_rule_append(r, "zone_%s_forward", zone->name);
  		}
  
