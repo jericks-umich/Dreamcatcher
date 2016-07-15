@@ -1,6 +1,6 @@
 #include <conductor.h>
 
-void conduct() {
+void* conduct(void* arg) {
   // TODO: 
   // Loop
     // Poll the config file for changes
