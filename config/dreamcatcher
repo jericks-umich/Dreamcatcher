@@ -1,0 +1,20 @@
+# sample dreamcatcher configuration file
+# the "config info" section must be present
+# you can add additional radio interface prefixes (for instance wlan1)
+# by adding another line "list interface_prefix 'wlan1'" below the first
+
+config info
+	list interface_prefix 'wlan0'
+
+#config rule 'a1c317fac53a94641b38709168e11e96'
+#  option message 'Lightbulb wants to send messages to Laptop'
+#  option title '0'
+#  option src_vlan '10'
+#  option dst_vlan '11'
+#  option proto 'tcp'
+#  option src_ip '192.168.1.2'
+#  option dst_ip '192.168.1.3'
+#  option src_port '46264'
+#  option dst_port '80'
+#  option verdict 'REJECT'
+#  option approved '0'
