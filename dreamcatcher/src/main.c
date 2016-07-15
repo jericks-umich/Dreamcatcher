@@ -373,8 +373,8 @@ int cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struct nfq_data *nfa, vo
   } else {
     LOGW("Cannot parse packet. Not sure what to do!");
   }
-  ret = nfq_set_verdict(qh, id, NF_REJECT, 0, NULL);
-  LOGD("Set REJECT verdict. Return value: %d", ret);
+  ret = nfq_set_verdict(qh, id, NF_DROP, 0, NULL);
+  LOGD("Set DROP verdict. Return value: %d", ret);
   print_pkt(nfa);
   add_rule(nfa);
   reload_firewall();
