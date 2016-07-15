@@ -3,6 +3,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <pthread.h>
 
 #include <openssl/md5.h>
 
@@ -347,8 +348,43 @@ int unlock_close_config(int fd) {
   return retval;
 }
 
+void initialize_rule_queue() {
+  rule_queue = calloc(32, sizeof(rule));
+  lock = calloc(1, sizeof(pthread_mutex_t));
+  pthread_mutex_init(lock, NULL);
+  start = rule_queue;
+  end = rule_queue;
+}
 
+// pass a filled rule struct to be pushed
+int push_rule_to_queue(rule* r) {
+  acquire_lock();
+  if ((end - start + sizeof(rule)) % (32*sizeof(rule)) == 0) { // failure condition
+    return -1; // do not push
+  }
+  memcpy(end, r, sizeof(rule));
+  end = ((end - rule_queue + sizeof(rule)) % (32*sizeof(rule))) + rule_queue;
+  release_lock();
+}
 
+// pass a blank rule struct to be filled
+int pop_rule_from_queue(rule* r) {
+  acquire_lock();
+  if (start == end) {
+    return -1; // do not pop, empty
+  }
+  memcpy(r, start, sizeof(rule));
+  start = ((start - rule_queue + sizeof(rule)) % (32*sizeof(rule))) + rule_queue;
+  release_lock();
+}
+
+void acquire_lock() {
+  pthread_mutex_lock(lock);
+}
+
+void release_lock() {
+  pthread_mutex_unlock(lock);
+}
 
 
 

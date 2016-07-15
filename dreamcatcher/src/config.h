@@ -2,6 +2,7 @@
 #define DREAMCATCHER_CONFIG_H
 
 #include <fcntl.h>
+#include <pthread.h>
 
 #include <uci.h>
 
@@ -64,6 +65,11 @@ typedef struct rule {
   // meaning the rule has not been approved by the user yet
 } rule;
 
+rule* rule_queue;
+pthread_mutex_t* lock;
+rule* start; // point to places in rule_queue
+rule* end; // point to places in rule_queue
+
 void set_message(rule* r);
 char* get_verdict_string(verdict v);
 void hash_rule(rule* r);
@@ -76,5 +82,10 @@ void add_new_named_rule_section(struct uci_context *ctx, const char* hash);
 void rule_uci_set_int(struct uci_context *ctx, const char* hash, const char* option, const unsigned int value);
 void rule_uci_set_str(struct uci_context *ctx, const char* hash, const char* option, const char* value);
 
+void initialize_rule_queue();
+int push_rule_to_queue(rule* r);
+int pop_rule_from_queue(rule* r);
+void acquire_lock();
+void release_lock();
 
 #endif // DREAMCATCHER_CONFIG_H

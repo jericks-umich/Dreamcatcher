@@ -3,8 +3,8 @@
 #include <unistd.h>
 #include <string.h>
 #include <errno.h>
-
 #include <pthread.h>
+
 #include <netinet/in.h>
 #include <linux/types.h>
 #include <linux/netfilter.h>            /* for NF_ACCEPT */
@@ -405,6 +405,8 @@ int main(int argc, char **argv)
   // reload firewall
   //reload_firewall();
 
+  // initialize rule_queue
+  initialize_rule_queue();
   // create new thread for conducting new rules to google/client application
   rv = pthread_create(&conductor_thread, NULL, &conduct, NULL);
 
@@ -449,6 +451,7 @@ int main(int argc, char **argv)
 
   // TODO: do some signal handling to detect early close
   pthread_cancel(conductor_thread);
+  free(rule_queue);
 
 	exit(0);
 }
