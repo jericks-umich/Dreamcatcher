@@ -85,9 +85,12 @@ mkdir -p $OPENWRT_DIR/package/network/config/firewall/patches
 rm $OPENWRT_DIR/package/network/config/firewall/patches/701-dreamcatcher-chain.patch 2>/dev/null
 ln -s $PATCH_DIR/701-dreamcatcher-chain.patch $OPENWRT_DIR/package/network/config/firewall/patches/701-dreamcatcher-chain.patch
 # firewall3 - allow reloading of dreamcatcher firewall chain
-# don't build while still under development
-#rm $OPENWRT_DIR/package/network/config/firewall/patches/702-dreamcatcher-firewall-reload.patch 2>/dev/null
-#ln -s $PATCH_DIR/702-dreamcatcher-firewall-reload.patch $OPENWRT_DIR/package/network/config/firewall/patches/702-dreamcatcher-firewall-reload.patch
+rm $OPENWRT_DIR/package/network/config/firewall/patches/702-dreamcatcher-firewall-reload.patch 2>/dev/null
+ln -s $PATCH_DIR/702-dreamcatcher-firewall-reload.patch $OPENWRT_DIR/package/network/config/firewall/patches/702-dreamcatcher-firewall-reload.patch
+# firewall3 - automatically create NFQUEUE target default rule to send packets to dreamcatcher
+rm $OPENWRT_DIR/package/network/config/firewall/patches/703-dreamcatcher-nfqueue-rule.patch 2>/dev/null
+ln -s $PATCH_DIR/703-dreamcatcher-nfqueue-rule.patch $OPENWRT_DIR/package/network/config/firewall/patches/703-dreamcatcher-nfqueue-rule.patch
+
 
 #### MAKE ####
 # make openwrt
