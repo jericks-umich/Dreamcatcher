@@ -12,7 +12,7 @@ CONFIG_DIR=$THIS_DIR/config
 PATCH_DIR=$THIS_DIR/patches
 DREAMCATCHER_DIR=$THIS_DIR/dreamcatcher
 LUCI_APP_DREAMCATCHER_DIR=$THIS_DIR/luci-app-dreamcatcher
-DEPS="git-core build-essential libssl-dev libncurses5-dev unzip gawk"
+DEPS="git-core build-essential libssl-dev libncurses5-dev unzip gawk subversion quilt"
 
 for arg in "$@"; do
 	case $arg in
