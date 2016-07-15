@@ -27,7 +27,6 @@
 +      fw3_ipt_rule_comment(r,"Default DREAMCATCHER -> NFQUEUE");
 +      fw3_ipt_rule_target(r, "NFQUEUE");
 +      fw3_ipt_rule_addarg(r, NULL, "--queue-num", "4670"); // TODO: make the queue number configurable
-+      fw3_ipt_rule_addarg(r, NULL, "--queue-bypass", NULL);
 +      fw3_ipt_rule_append(r, "zone_%s_forward", zone->name);
  		}
  
