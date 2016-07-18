@@ -88,17 +88,19 @@ function accept_rule()
 		x:set("dreamcatcher",accept_rule,"approved","1")
 		x:set("dreamcatcher",accept_rule,"verdict","ACCEPT")
 		x:commit("dreamcatcher")
+		os.execute("/sbin/fw3 reload-dreamcatcher")
 	end
 end
 
 function reject_rule()
 	local reject_rule = http.formvalue("reject")                                                                                   
-        local x = luci.model.uci.cursor()                                                                                              
-        if (x:get("dreamcatcher",reject_rule,"approved")=="0") then                                                                        
-                x:set("dreamcatcher",reject_rule,"approved","1")                                                                       
-                x:set("dreamcatcher",reject_rule,"verdict","REJECT")                                                                   
-                x:commit("dreamcatcher")                                                                                               
-        end
+    local x = luci.model.uci.cursor()                                                                                              
+    if (x:get("dreamcatcher",reject_rule,"approved")=="0") then                                                                        
+            x:set("dreamcatcher",reject_rule,"approved","1")                                                                       
+            x:set("dreamcatcher",reject_rule,"verdict","REJECT")                                                                   
+            x:commit("dreamcatcher") 
+            os.execute("/sbin/fw3 reload-dreamcatcher")                                                                                              
+    end
 end
 
 function advanced_perm_rule_table()
@@ -392,7 +394,8 @@ function delete_rule()
 	local delete_rule = http.formvalue("delete")
 	local x=luci.model.uci.cursor()
 	if(x:delete("dreamcatcher",delete_rule)) then
-		x:commit("dreamcatcher")	
+		x:commit("dreamcatcher")
+		os.execute("/sbin/fw3 reload-dreamcatcher")	
 	end
 end
 
@@ -506,6 +509,7 @@ function add_rule()
 		x:set("dreamcatcher",name,"approved","0")    	
 	end
 	x:commit("dreamcatcher")
+	os.execute("/sbin/fw3 reload-dreamcatcher")
 end
 
 function add_devices()
@@ -627,6 +631,7 @@ function delete_devices()
 						if (src_vlan == vlan or dst_vlan == vlan) then
 							if(x:delete("dreamcatcher",IcName)) then
 								x:commit("dreamcatcher")
+								os.execute("/sbin/fw3 reload-dreamcatcher")
 							end
 						end
 					end) 
