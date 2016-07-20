@@ -52,6 +52,7 @@ function Rule_General()
                 elseif src_vlan ~= nil then              
                         add_rule()
                 end                                  
+		http.redirect(luci.dispatcher.build_url("admin","security","rule","rules_1"));
         end                                          
         luci.template.render("admin_security/rules",{
                 permanent = general_perm_rule_table(),
@@ -74,11 +75,13 @@ function Rule_Advanced()
 		else
 			add_rule()
 		end
-	end
-	luci.template.render("admin_security/rules",{                                     
-                permanent = advanced_perm_rule_table(),                                              
-                temp = advanced_temp_rule_table()       
-	}) 
+		http.redirect(luci.dispatcher.build_url("admin","security","rule","rules_2"));
+	else
+		luci.template.render("admin_security/rules",{                                     
+               		permanent = advanced_perm_rule_table(),                                              
+                	temp = advanced_temp_rule_table()       
+		})
+	end 
 end
 
 function accept_rule()
@@ -88,19 +91,17 @@ function accept_rule()
 		x:set("dreamcatcher",accept_rule,"approved","1")
 		x:set("dreamcatcher",accept_rule,"verdict","ACCEPT")
 		x:commit("dreamcatcher")
-		os.execute("/sbin/fw3 reload-dreamcatcher")
 	end
 end
 
 function reject_rule()
 	local reject_rule = http.formvalue("reject")                                                                                   
-    local x = luci.model.uci.cursor()                                                                                              
-    if (x:get("dreamcatcher",reject_rule,"approved")=="0") then                                                                        
-            x:set("dreamcatcher",reject_rule,"approved","1")                                                                       
-            x:set("dreamcatcher",reject_rule,"verdict","REJECT")                                                                   
-            x:commit("dreamcatcher") 
-            os.execute("/sbin/fw3 reload-dreamcatcher")                                                                                              
-    end
+        local x = luci.model.uci.cursor()                                                                                              
+        if (x:get("dreamcatcher",reject_rule,"approved")=="0") then                                                                        
+                x:set("dreamcatcher",reject_rule,"approved","1")                                                                       
+                x:set("dreamcatcher",reject_rule,"verdict","REJECT")                                                                   
+                x:commit("dreamcatcher")                                                                                               
+        end
 end
 
 function advanced_perm_rule_table()
@@ -394,8 +395,7 @@ function delete_rule()
 	local delete_rule = http.formvalue("delete")
 	local x=luci.model.uci.cursor()
 	if(x:delete("dreamcatcher",delete_rule)) then
-		x:commit("dreamcatcher")
-		os.execute("/sbin/fw3 reload-dreamcatcher")	
+		x:commit("dreamcatcher")	
 	end
 end
 
@@ -509,7 +509,6 @@ function add_rule()
 		x:set("dreamcatcher",name,"approved","0")    	
 	end
 	x:commit("dreamcatcher")
-	os.execute("/sbin/fw3 reload-dreamcatcher")
 end
 
 function add_devices()
@@ -631,7 +630,6 @@ function delete_devices()
 						if (src_vlan == vlan or dst_vlan == vlan) then
 							if(x:delete("dreamcatcher",IcName)) then
 								x:commit("dreamcatcher")
-								os.execute("/sbin/fw3 reload-dreamcatcher")
 							end
 						end
 					end) 
