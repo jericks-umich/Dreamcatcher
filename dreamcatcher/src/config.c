@@ -358,24 +358,37 @@ void initialize_rule_queue() {
 
 // pass a filled rule struct to be pushed
 int push_rule_to_queue(rule* r) {
+  LOGV("PUSH RULE");
   acquire_lock();
-  if ((end - start + sizeof(rule)) % (32*sizeof(rule)) == 0) { // failure condition
+  if (((end+1) - start) % (32*sizeof(rule)) == 0) { // failure condition
+    LOGV("can't push, full");
+    release_lock();
     return -1; // do not push
   }
   memcpy(end, r, sizeof(rule));
-  end = ((end - rule_queue + sizeof(rule)) % (32*sizeof(rule))) + rule_queue;
+  end += 1;
+  if ((end - rule_queue) > 32*sizeof(rule)) {
+    end -= 32;
+  }
   release_lock();
+  return 0;
 }
 
 // pass a blank rule struct to be filled
 int pop_rule_from_queue(rule* r) {
+  LOGV("POP RULE");
   acquire_lock();
   if (start == end) {
+    release_lock();
     return -1; // do not pop, empty
   }
   memcpy(r, start, sizeof(rule));
-  start = ((start - rule_queue + sizeof(rule)) % (32*sizeof(rule))) + rule_queue;
+  start += 1;
+  if ((start - rule_queue) > 32*sizeof(rule)) {
+    start -= 32;
+  }
   release_lock();
+  return 0;
 }
 
 void acquire_lock() {
