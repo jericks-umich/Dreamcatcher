@@ -656,7 +656,9 @@ function add_devices()
                 file:write('\t\tTunnel-Private-Group-ID = "' .. tostring(GroupID) .. '",\n')                                                                                                      
                 file:write('\t\tReply-Message = "Hello, %{User-Name}",\n')                                                                                                                        
                 file:write('\t\tFall-Through = Yes\n\n')                                                                                                                                            
-                file:close()                                                                                                                                                                      
+                file:close()
+                os.execute("killall radiusd") -- restart and reload not implemented 
+                os.execute("/etc/init.d/radiusd start")                                                                                                                                                                      
                 message = message .. '<pre><span class="inner-pre" style="font-size:20px">Device name: ' 
 			.. dname ..  "<br><br>Password: " 
 			.. password:sub(1,4) .. " "
@@ -737,6 +739,8 @@ function delete_devices()
 	local writefile = io.open("/etc/freeradius2/users","w")
 	writefile:write(wfile)
 	writefile:close()
+	os.execute("killall radiusd") -- restart and reload not implemented 
+    os.execute("/etc/init.d/radiusd start")
 	luci.template.render("admin_security/password",{
 		TODO = "",
 		table_text = GenerateTable()
