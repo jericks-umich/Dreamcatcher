@@ -25,6 +25,7 @@ void* conduct(void* arg) {
 }
 
 void send_message(rule* r){
+  int ret = 0;
   char* hash = r->hash;
   char* message = r->message;
   protocol proto = r->proto;
@@ -36,7 +37,7 @@ void send_message(rule* r){
 
   struct curl_slist* headers = NULL;
   char* key_header = "Authorization: key=AIzaSyCkzLOzVdzLj_FLh2Y2X2k4cKfRt0L8TsQ";
-  char* target = "fuNfN3w646k:APA91bF09PmuCnUwPYK29-DMNHNdEUa92slZbxV-l3VOxDmRSbUWuwhTWqI95O4h-glR51yRzLhgEttblcgzxa_M4stgp8XMJtZt3TYPOHdudd-gaH4hZ7nEgUnw_IHKB0z61jpqKb1P";
+  char* target = "fml6T7L_uII:APA91bH-Ht900G-Y_Wpt5l8dnAx7lJLaz7kQxhktXiwLdVLQ8PKaDCOwrM28Z3YctAGDlldGT7Mrk_8ntEcr3Wq1U2jxDJCwwkIl7q6J6snOB3TjJW7hetGaA02Evv07p6Bteh1OLAGE";
 
   headers = curl_slist_append(headers,"Accept: application/json");
   headers = curl_slist_append(headers,"Content-Type:application/json");
@@ -44,13 +45,29 @@ void send_message(rule* r){
 
   char jsonObj[1024];
   //TODO: router_ip and token need filling
-  snprintf(jsonObj, sizeof(jsonObj), "{ \"data\": { \"id\" : %s, \"message\" : %s, \"proto\" : %s, \"src_ip\" : %s, \"dst_ip\" : %s, \"src_port\" : %d, \"dst_port\" : %d, \"token\" : \"\", \"router_ip\" : \"\", }, \"to\" : \"%s\" }", hash, message, proto_string, src_ip, dst_ip, src_port, dst_port, target);
+  snprintf(jsonObj, sizeof(jsonObj), 
+      "{ \
+        \"data\": \
+        { \
+          \"id\" : \"%s\", \
+          \"message\" : \"%s\", \
+          \"proto\" : \"%s\", \
+          \"src_ip\" : \"%s\", \
+          \"dst_ip\" : \"%s\", \
+          \"src_port\" : \"%d\", \
+          \"dst_port\" : \"%d\", \
+          \"token\" : \"\", \
+          \"router_ip\" : \"\", \
+        }, \
+        \"to\" : \"%s\" \
+      }", hash, message, proto_string, src_ip, dst_ip, src_port, dst_port, target);
 
   LOGD("message: %s", jsonObj);
   CURL *curl = curl_easy_init();
   curl_easy_setopt(curl,CURLOPT_URL,"https://gcm-http.googleapis.com/gcm/send");
   curl_easy_setopt(curl,CURLOPT_POSTFIELDS,jsonObj);
   curl_easy_setopt(curl,CURLOPT_HTTPHEADER,headers);
-  curl_easy_perform(curl);
+  ret = curl_easy_perform(curl);
+  LOGD("ret = %d", ret);
   curl_easy_cleanup(curl);
 }
