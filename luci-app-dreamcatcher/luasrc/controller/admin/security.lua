@@ -46,15 +46,15 @@ function Rule_General()
 		if delete~=nil then      
                         delete_rule()    
                 elseif accept ~= nil then
-                        accept_rule()    
+                        accept_rule_general()    
                 elseif reject ~= nil then
-                        reject_rule()
+                        reject_rule_general()
                 elseif src_vlan ~= nil then              
                         add_rule()
                 end                                  
 		http.redirect(luci.dispatcher.build_url("admin","security","rule","rules_1"));
         end                                          
-        luci.template.render("admin_security/rules",{
+	        luci.template.render("admin_security/rules_1",{
                 permanent = general_perm_rule_table(),
                 temp = general_temp_rule_table()
         })
@@ -69,40 +69,132 @@ function Rule_Advanced()
 		if delete~=nil then
 			delete_rule()
 		elseif accept ~= nil then
-			accept_rule()
+			accept_rule_advanced()
 		elseif reject ~= nil then
-			reject_rule()
+			reject_rule_advanced()
 		else
 			add_rule()
 		end
 		http.redirect(luci.dispatcher.build_url("admin","security","rule","rules_2"));
 	else
-		luci.template.render("admin_security/rules",{                                     
+		luci.template.render("admin_security/rules_2",{                                     
                		permanent = advanced_perm_rule_table(),                                              
                 	temp = advanced_temp_rule_table()       
 		})
 	end 
 end
 
-function accept_rule()
+function accept_rule_advanced()
 	local accept_rule = http.formvalue("accept")
 	local x = luci.model.uci.cursor()
 	if (x:get("dreamcatcher",accept_rule,"approved")=="0") then
 		x:set("dreamcatcher",accept_rule,"approved","1")
 		x:set("dreamcatcher",accept_rule,"verdict","ACCEPT")
 		x:commit("dreamcatcher")
+		os.execute("/sbin/fw3 reload-dreamcatcher")
 	end
 end
 
-function reject_rule()
+function reject_rule_advanced()
 	local reject_rule = http.formvalue("reject")                                                                                   
         local x = luci.model.uci.cursor()                                                                                              
         if (x:get("dreamcatcher",reject_rule,"approved")=="0") then                                                                        
                 x:set("dreamcatcher",reject_rule,"approved","1")                                                                       
                 x:set("dreamcatcher",reject_rule,"verdict","REJECT")                                                                   
                 x:commit("dreamcatcher")                                                                                               
+                os.execute("/sbin/fw3 reload-dreamcatcher")
         end
 end
+
+function accept_rule_general()
+	local accept_rule = http.formvalue("accept")
+	local x = luci.model.uci.cursor()
+	if (x:get("dreamcatcher",accept_rule,"approved")=="0") then
+		local message = x:get("dreamcatcher",accept_rule,"message")
+		local src_vlan = x:get("dreamcatcher",accept_rule,"src_vlan")	
+		local dst_vlan = x:get("dreamcatcher",accept_rule,"dst_vlan")
+		local title = x:get("dreamcatcher",accept_rule,"title")
+		if (message == nil) then
+			message = ""
+		end
+		if (src_vlan == nil) then
+			src_vlan = ""
+		end
+		if (dst_vlan == nil) then
+			dst_vlan = ""
+		end
+		if (title == nil) then
+			title = ""
+		end
+		local string = "title" .. title .. "src_vlan" .. src_vlan .. "dst_vlan" .. dst_vlan .. "proto"  .. "src_ip" 
+                                .. "dst_ip" .. "src_port" .. "dst_port"  		
+		if (x:delete("dreamcatcher",accept_rule)) then
+			local name = getMD5(string)                                                                                            
+                	x:set("dreamcatcher",name,"rule")   			
+			if (message ~= "") then
+				x:set("dreamcatcher",name,"message",message)
+			end
+			if (src_vlan ~= "") then
+				x:set("dreamcatcher",name,"src_vlan",src_vlan)
+			end
+			if (dst_vlan ~= "") then
+				x:set("dreamcatcher",name,"dst_vlan",dst_vlan)
+			end
+			if (title ~= "") then
+				x:set("dreamcatcher",name,"title",title)
+			end
+			x:set("dreamcatcher",name,"approved","1")
+			x:set("dreamcatcher",name,"verdict","ACCEPT")
+			x:commit("dreamcatcher")
+			os.execute("/sbin/fw3 reload-dreamcatcher")
+		end
+	end
+end
+
+function reject_rule_general()                                                                                                         
+        local reject_rule = http.formvalue("reject")                                                                                   
+        local x = luci.model.uci.cursor()                                                                                              
+        if (x:get("dreamcatcher",reject_rule,"approved")=="0") then                                                                    
+                local message = x:get("dreamcatcher",reject_rule,"message")                                                            
+                local src_vlan = x:get("dreamcatcher",reject_rule,"src_vlan")                                                          
+                local dst_vlan = x:get("dreamcatcher",reject_rule,"dst_vlan")                                                          
+                local title = x:get("dreamcatcher",reject_rule,"title")                                                                
+                if (message == nil) then                                                                                               
+                        message = ""                                                                                                   
+                end                                                                                                                    
+                if (src_vlan == nil) then                                                                                              
+                        src_vlan = ""                                                                                                  
+                end                                                                                                                    
+                if (dst_vlan == nil) then                                                                                              
+                        dst_vlan = ""                                                                                                  
+                end                                                                                                                    
+                if (title == nil) then                                                                                                 
+                        title = ""                                                                                                     
+                end                                                                                                                    
+                local string = "title" .. title .. "src_vlan" .. src_vlan .. "dst_vlan" .. dst_vlan .. "proto"  .. "src_ip"            
+                                .. "dst_ip" .. "src_port" .. "dst_port"                                                                
+                if (x:delete("dreamcatcher",reject_rule)) then                                                                         
+                        local name = getMD5(string)                                                                                    
+                        x:set("dreamcatcher",name,"rule")                                                                              
+                        if (message ~= "") then                                                                                        
+                                x:set("dreamcatcher",name,"message",message)                                                           
+                        end                                                                                                            
+                        if (src_vlan ~= "") then                                                                                       
+                                x:set("dreamcatcher",name,"src_vlan",src_vlan)                                                         
+                        end                                                                                                            
+                        if (dst_vlan ~= "") then                                                                                       
+                                x:set("dreamcatcher",name,"dst_vlan",dst_vlan)                                                         
+                        end                                                                                                            
+                        if (title ~= "") then                                                                                          
+                                x:set("dreamcatcher",name,"title",title)                                                               
+                        end                                                                                                            
+                        x:set("dreamcatcher",name,"approved","1")                                                                      
+                        x:set("dreamcatcher",name,"verdict","REJECT")                                                                  
+                        x:commit("dreamcatcher") 
+                        os.execute("/sbin/fw3 reload-dreamcatcher")                                                                                      
+                end                                                                                                                    
+        end                                                                                                                            
+end               
 
 function advanced_perm_rule_table()
 	local x = luci.model.uci.cursor()
@@ -396,6 +488,7 @@ function delete_rule()
 	local x=luci.model.uci.cursor()
 	if(x:delete("dreamcatcher",delete_rule)) then
 		x:commit("dreamcatcher")	
+		os.execute("/sbin/fw3 reload-dreamcatcher")
 	end
 end
 
@@ -509,6 +602,7 @@ function add_rule()
 		x:set("dreamcatcher",name,"approved","0")    	
 	end
 	x:commit("dreamcatcher")
+	os.execute("/sbin/fw3 reload-dreamcatcher")
 end
 
 function add_devices()
@@ -630,6 +724,7 @@ function delete_devices()
 						if (src_vlan == vlan or dst_vlan == vlan) then
 							if(x:delete("dreamcatcher",IcName)) then
 								x:commit("dreamcatcher")
+								os.execute("/sbin/fw3 reload-dreamcatcher")
 							end
 						end
 					end) 
