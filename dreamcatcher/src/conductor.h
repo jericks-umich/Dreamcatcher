@@ -3,4 +3,6 @@
 
 void* conduct(void* arg);
 
+void* send_message();
+
 #endif // CONDUCTOR_H
