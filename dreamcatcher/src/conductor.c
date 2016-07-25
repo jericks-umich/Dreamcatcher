@@ -36,7 +36,7 @@ void send_message(rule* r){
 
   struct curl_slist* headers = NULL;
   char* key_header = "Authorization: key=AIzaSyCkzLOzVdzLj_FLh2Y2X2k4cKfRt0L8TsQ";
-  char* target = "fv_V70tXDUo:APA91bHyOVeAW9FWMQjoU9ui1HELYuO5F1Eu1NDQrd8hNAZk0bXGQnZZxcU-riPNqskyySHdHRFK0h9-u5mVUqTRuhHByHo_stzngOXyPfH7DRIbpLix2A3hwHLPokPEAyYBkBOCoPUw";
+  char* target = "fuNfN3w646k:APA91bF09PmuCnUwPYK29-DMNHNdEUa92slZbxV-l3VOxDmRSbUWuwhTWqI95O4h-glR51yRzLhgEttblcgzxa_M4stgp8XMJtZt3TYPOHdudd-gaH4hZ7nEgUnw_IHKB0z61jpqKb1P";
 
   headers = curl_slist_append(headers,"Accept: application/json");
   headers = curl_slist_append(headers,"Content-Type:application/json");
