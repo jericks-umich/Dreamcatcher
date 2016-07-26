@@ -1,0 +1,24 @@
+<%+header%>
+<h1 style="text-align:center"><a id="message" name="message"><%=message%></a></h1>
+
+<form id="switching_page" method="get" action="verdict_1">
+  <input type="hidden" name="id" value="<%=id%>"/>
+  <input style="float:right" type="button" onclick="switch_page()" value="Switch to General page" />
+  <br>
+</form>
+
+<pre><table style="width:100%;margin:0px">
+<%=content%>
+</table></pre>
+
+<script>
+function modify_rule(IcName,method){                      
+        document.getElementById(IcName.concat(method)).submit();
+}
+
+function switch_page(){
+	document.getElementById("switching_page").submit();
+}    
+</script>
+
+<%+footer%>

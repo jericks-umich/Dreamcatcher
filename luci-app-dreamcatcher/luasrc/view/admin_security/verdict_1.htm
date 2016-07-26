@@ -1,0 +1,27 @@
+<%+header%>
+<h1 style="text-align:center"><a id="message" name="message"><%=message%></a></h1>
+
+<form id="switching_page" method="get" action="verdict_2">
+  <input type="hidden" name="id" value="<%=id%>"/>
+  <input style="float:right" type="button" onclick="switch_page()" value="Switch to Advanced page" />
+  <br>
+</form>
+
+<pre><table style="width:100%;margin:0px">
+<%=content%>
+</table></pre>
+
+<script>
+function modify_rule(IcName,method){                      
+        r = confirm("Warning:\nAllowing/Blocking connections will Allow/Block ALL such connections. This may have security implications or may mean your devices will not work properly. Are you sure you want to do this? \n\nIf you would like more information and to selectively allow connections from, please use the Advanced tab.");
+	if (r == true){                                                                                                                                                                             
+        	document.getElementById(IcName.concat(method)).submit();
+        }
+}
+
+function switch_page(){
+	document.getElementById("switching_page").submit();
+}  
+</script>
+
+<%+footer%>
