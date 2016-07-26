@@ -375,11 +375,11 @@ int cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struct nfq_data *nfa, vo
   } else {
     LOGW("Cannot parse packet. Not sure what to do!");
   }
-  ret = nfq_set_verdict(qh, id, NF_DROP, 0, NULL);
-  LOGD("Set DROP verdict. Return value: %d", ret);
   print_pkt(nfa);
   add_rule(nfa);
   reload_firewall();
+  ret = nfq_set_verdict(qh, id, NF_DROP, 0, NULL);
+  LOGD("Set DROP verdict. Return value: %d", ret);
   return ret;
 }
 
@@ -399,6 +399,7 @@ int main(int argc, char **argv)
 	struct nfnl_handle *nh;
 	int fd;
 	int rv;
+  int ret;
 	char buf[4096] __attribute__ ((aligned));
   pthread_t conductor_thread;
 
@@ -443,7 +444,8 @@ int main(int argc, char **argv)
 	fd = nfq_fd(h);
 	while ((rv = recv(fd, buf, sizeof(buf), 0)) && rv >= 0) {
 		LOGV("pkt received");
-		nfq_handle_packet(h, buf, rv);
+		ret = nfq_handle_packet(h, buf, rv);
+    LOGV("nfq_handle_packet returns %d", ret);
 	}
   LOGD("Quitting because we received %d: %s", rv, strerror(errno));
 	LOGV("unbinding from queue %d", QUEUE_NUM);
