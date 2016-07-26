@@ -96,8 +96,8 @@ ln -s $PATCH_DIR/703-dreamcatcher-nfqueue-rule.patch $OPENWRT_DIR/package/networ
 # make openwrt
 echo "Building openwrt. This may take a while."
 pushd $OPENWRT_DIR
-make # making with multiple threads often causes build to fail
-#make -j$(nproc)
+#make # making with multiple threads often causes build to fail
+make -j$(nproc)
 _status=$?
 popd
 
