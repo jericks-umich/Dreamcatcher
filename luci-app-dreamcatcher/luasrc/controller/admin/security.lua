@@ -11,6 +11,120 @@ function index()
 	entry({"admin","security","rule"}, firstchild(),"Rules",5).dependent=false
 	entry({"admin","security","rule","rules_1"},call("Rule_General"),"General",6).dependent=false
 	entry({"admin","security","rule","rules_2"},call("Rule_Advanced"),"Advanced",7).dependent=false
+	entry({"admin","security","verdict_1"},call("Verdict_1"),"",9).dependent=false
+	entry({"admin","security","verdict_2"},call("Verdict_2"),"",10).depentdent=false
+end
+
+function Verdict_1()                                                                                              
+        local http_method = http.getenv("REQUEST_METHOD")                                                         
+        if http_method ~= "GET" then                                                                              
+                http.redirect(luci.dispatcher.build_url("admin","security","rule","rules_1"))                     
+        else                                                                                                      
+                local id = http.formvalue("id")                                                                   
+                if id == nil then                                                                                 
+                        http.redirect(luci.dispatcher.build_url("admin","security","rule","rules_1"))             
+                else                                                                                                
+                        local x = luci.model.uci.cursor()                                                           
+                        local message = x:get("dreamcatcher",id,"message")                                          
+                        local src_vlan = x:get("dreamcatcher",id,"src_vlan")                                        
+                        local dst_vlan = x:get("dreamcatcher",id,"dst_vlan")                                        
+                        local proto = x:get("dreamcatcher",id,"proto")                                              
+                        local src_ip = x:get("dreamcatcher",id,"src_ip")                                            
+                        local dst_ip = x:get("dreamcatcher",id,"dst_ip")                                            
+                        local src_port = x:get("dreamcatcher",id,"src_port")                                                                                   
+                        local dst_port = x:get("dreamcatcher",id,"dst_port")                                                                                   
+                        local approved = x:get("dreamcatcher",id,"approved")                                                                                   
+                        if (message == nil or approved ~= '0') then                                                                                            
+                                http.redirect(luci.dispatcher.build_url("admin","security","rule","rules_1"))                                                  
+                        else                                                                                                                                   
+								local content = "<tr>"                                                           
+                                .. "<td style=\"text-align:center\">"                               
+                                .. '<form style="margin:0px;display:inline" id="' .. id .. "accept" .. '" action="rule/rules_1" method="POST">'
+                                .. '<input type="hidden" name="accept" value="' .. id .. '"></input>'                                          
+                                .. '<input type="button" onclick="modify_rule(\'' .. id .. '\',\'accept\')" value="Accept"></input>'           
+                                .. '</form>'                                                                                                   
+                                .. "</td>"                                                                                                     
+                                .. "<td style=\"text-align:center\">"                                                                          
+                                .. '<form style="margin:0px;display:inline" id="' .. id .. "reject" .. '" action="rule/rules_1" method="POST">'
+                                .. '<input type="hidden" name="reject" value="' .. id .. '"></input>'                                          
+                                .. '<input type="button" onclick="modify_rule(\'' .. id .. '\',\'reject\')" value="Reject"></input>'           
+                                .. '</form>'                                                                                                   
+                                .. "</td>"                                                                                                     
+                                .. "</tr>"                                                                                                     
+                                luci.template.render("admin_security/verdict_1",{                                                                              
+                                        id = id,
+										message = message,                                                                                                     
+                                        content = content                                                                                                      
+                                })                                                                                                                             
+                        end                                                                                                                                    
+                end                                                                                                                                            
+        end                                                                                                                                                    
+end                                       
+
+function Verdict_2()
+	local http_method = http.getenv("REQUEST_METHOD")
+	if http_method ~= "GET" then
+		http.redirect(luci.dispatcher.build_url("admin","security","rule","rules_2"))
+	else
+		local id = http.formvalue("id")
+		if id == nil then
+			http.redirect(luci.dispatcher.build_url("admin","security","rule","rules_2"))
+		else
+			local x = luci.model.uci.cursor()
+			local message = x:get("dreamcatcher",id,"message")
+			local src_vlan = x:get("dreamcatcher",id,"src_vlan")
+			local dst_vlan = x:get("dreamcatcher",id,"dst_vlan")
+			local proto = x:get("dreamcatcher",id,"proto")
+			local src_ip = x:get("dreamcatcher",id,"src_ip")
+			local dst_ip = x:get("dreamcatcher",id,"dst_ip")
+			local src_port = x:get("dreamcatcher",id,"src_port")
+			local dst_port = x:get("dreamcatcher",id,"dst_port")
+			local approved = x:get("dreamcatcher",id,"approved")
+			if (message == nil or approved ~= '0') then
+	                        http.redirect(luci.dispatcher.build_url("admin","security","rule","rules_2"))                      
+			else 
+				local content = "<tr>" 
+						.. "<td style=\"text-align:center\">proto</td>"
+						.. "<td style=\"text-align:center\">" .. (proto or "") .. "</td>"
+						.. "</tr>"
+						.. "<tr>"
+						.. "<td style=\"text-align:center\">src_ip</td>"
+                        .. "<td style=\"text-align:center\">" .. (src_ip or "") .. "</td>"
+						.. "</tr>"
+                        .. "<tr>"                                                                                                                                                   
+                        .. "<td style=\"text-align:center\">dst_ip</td>"                                                                                                                                        
+                        .. "<td style=\"text-align:center\">" .. (dst_ip or "") .. "</td>"                                                                                                                              
+                        .. "</tr>"
+                        .. "<tr>"                                                                                                                                                   
+                        .. "<td style=\"text-align:center\">src_port</td>"                                                                                                                                        
+                        .. "<td style=\"text-align:center\">" .. (src_port or "") .. "</td>"                                                                                                                              
+                        .. "</tr>"
+                        .. "<tr>"                                                                                                                                                   
+                        .. "<td style=\"text-align:center\">dst_port</td>"                                                                                                                                        
+                        .. "<td style=\"text-align:center\">" .. (dst_port or "") .. "</td>"                                                                                                                              
+                        .. "</tr>"                                                                                                                               
+						.. "<tr>"
+						.. "<td style=\"text-align:center\">"                                                                                                                                                   
+                        .. '<form style="margin:0px;display:inline" id="' .. id .. "accept" .. '" action="rule/rules_2" method="POST">'                                                                     
+                        .. '<input type="hidden" name="accept" value="' .. id .. '"></input>'                                                                                                   
+                        .. '<input type="button" onclick="modify_rule(\'' .. id .. '\',\'accept\')" value="Accept"></input>'                                                                    
+                        .. '</form>'
+						.. "</td>"
+						.. "<td style=\"text-align:center\">"                                                                                                                                                                
+                        .. '<form style="margin:0px;display:inline" id="' .. id .. "reject" .. '" action="rule/rules_2" method="POST">'                                                                     
+                        .. '<input type="hidden" name="reject" value="' .. id .. '"></input>'                                                                                                   
+                        .. '<input type="button" onclick="modify_rule(\'' .. id .. '\',\'reject\')" value="Reject"></input>'                                                                    
+                        .. '</form>'
+						.. "</td>"
+						.. "</tr>"
+				luci.template.render("admin_security/verdict_2",{
+					id = id,
+					message = message,
+					content = content
+				})
+			end						
+		end
+	end
 end
 
 function Device_page()
