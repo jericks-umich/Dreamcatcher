@@ -65,6 +65,7 @@ typedef struct rule {
   // meaning the rule has not been approved by the user yet
 } rule;
 
+#define RULE_QUEUE_SIZE 128
 rule* rule_queue;
 pthread_mutex_t* lock;
 rule* start; // point to places in rule_queue

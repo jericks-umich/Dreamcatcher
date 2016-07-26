@@ -370,7 +370,7 @@ int unlock_close_config(int fd) {
 }
 
 void initialize_rule_queue() {
-  rule_queue = calloc(32, sizeof(rule));
+  rule_queue = calloc(RULE_QUEUE_SIZE, sizeof(rule));
   lock = calloc(1, sizeof(pthread_mutex_t));
   pthread_mutex_init(lock, NULL);
   start = rule_queue;
@@ -381,15 +381,15 @@ void initialize_rule_queue() {
 int push_rule_to_queue(rule* r) {
   LOGV("PUSH RULE");
   acquire_lock();
-  if (((end+1) - start) % (32*sizeof(rule)) == 0) { // failure condition
+  if (((end+1) - start) % (RULE_QUEUE_SIZE*sizeof(rule)) == 0) { // failure condition
     LOGV("can't push, full");
     release_lock();
     return -1; // do not push
   }
   memcpy(end, r, sizeof(rule));
   end += 1;
-  if ((end - rule_queue) > 32*sizeof(rule)) {
-    end -= 32;
+  if ((end - rule_queue) > RULE_QUEUE_SIZE*sizeof(rule)) {
+    end -= RULE_QUEUE_SIZE;
   }
   release_lock();
   return 0;
@@ -405,8 +405,8 @@ int pop_rule_from_queue(rule* r) {
   }
   memcpy(r, start, sizeof(rule));
   start += 1;
-  if ((start - rule_queue) > 32*sizeof(rule)) {
-    start -= 32;
+  if ((start - rule_queue) > RULE_QUEUE_SIZE*sizeof(rule)) {
+    start -= RULE_QUEUE_SIZE;
   }
   release_lock();
   return 0;
