@@ -74,6 +74,7 @@ void set_message(rule* r);
 char* get_verdict_string(verdict v);
 void hash_rule(rule* r);
 void print_uci_ptr(struct uci_ptr* p);
+void print_sections(struct uci_package* pkg);
 int write_rule(rule* r);
 void clean_config();
 int lock_open_config();

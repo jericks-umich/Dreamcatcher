@@ -366,6 +366,7 @@ void print_icmp(struct icmphdr* i) {
 
 int cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struct nfq_data *nfa, void *data)
 {
+  LOGV("Got callback!");
   int ret;
   int id;
 	struct nfqnl_msg_packet_hdr *ph = nfq_get_msg_packet_hdr(nfa);

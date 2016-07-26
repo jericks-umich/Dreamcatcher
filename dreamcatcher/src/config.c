@@ -89,7 +89,7 @@ void hash_rule(rule* r) {
   if (r->src_port != 0) {
     snprintf(hash_string, sizeof(hash_string)-1, "%ssrc_port%d", hash_string, r->src_port);
   }
-  if (r->src_port != 0) {
+  if (r->dst_port != 0) {
     snprintf(hash_string, sizeof(hash_string)-1, "%sdst_port%d", hash_string, r->dst_port);
   }
   // take MD5 hash
@@ -97,6 +97,16 @@ void hash_rule(rule* r) {
   // convert hash_bytes into hex
   for (int i=0; i<sizeof(hash_bytes); i++) { // iterate over hash_bytes and append them in hex to r->hash
     snprintf(r->hash, sizeof(r->hash), "%s%02x", r->hash, hash_bytes[i]);
+  }
+}
+
+void print_sections(struct uci_package* pkg) {
+  struct uci_element* e;
+  //e = list_to_element((pkg->sections).next);
+  //for (;&e->list != &pkg->sections; ) {
+  //  e = list_to_element(e->list.next);
+  uci_foreach_element(&pkg->sections, e) {
+    LOGV("UCI section: %s", e->name);
   }
 }
   
@@ -146,49 +156,60 @@ int write_rule(rule* r) {
     LOGW("Didn't properly load config file");
     uci_perror(ctx,""); // TODO: replace this with uci_get_errorstr() and use our own logging functions
   }
+
+  // PRINT OUT ALL SECTIONS IN PACKAGE
+  print_sections(pkg);
+
   // calculate hash of rule for its id
   hash_rule(r); // now r->hash stores the unique id for this rule
   // create new entry/section
-  add_new_named_rule_section(ctx, r->hash);
+  add_new_named_rule_section(pkg->ctx, r->hash);
   // populate section
-  rule_uci_set_str(ctx, r->hash, "message", r->message); // required
-  rule_uci_set_int(ctx, r->hash, "title", r->title); // required
+  rule_uci_set_str(pkg->ctx, r->hash, "message", r->message); // required
+  rule_uci_set_int(pkg->ctx, r->hash, "title", r->title); // required
   if (r->src_vlan != 0) { // optional
-    rule_uci_set_int(ctx, r->hash, "src_vlan", r->src_vlan);
+    rule_uci_set_int(pkg->ctx, r->hash, "src_vlan", r->src_vlan);
   }
   if (r->dst_vlan != 0) { // optional
-    rule_uci_set_int(ctx, r->hash, "dst_vlan", r->dst_vlan);
+    rule_uci_set_int(pkg->ctx, r->hash, "dst_vlan", r->dst_vlan);
   }
-  rule_uci_set_str(ctx, r->hash, "proto", get_protocol_string(r->proto)); // required
+  rule_uci_set_str(pkg->ctx, r->hash, "proto", get_protocol_string(r->proto)); // required
   if (strncmp(r->src_ip, "\0", sizeof(r->src_ip)) != 0) { // optional
-    rule_uci_set_str(ctx, r->hash, "src_ip", r->src_ip);
+    rule_uci_set_str(pkg->ctx, r->hash, "src_ip", r->src_ip);
   }
   if (strncmp(r->dst_ip, "\0", sizeof(r->dst_ip)) != 0) { // optional
-    rule_uci_set_str(ctx, r->hash, "dst_ip", r->dst_ip);
+    rule_uci_set_str(pkg->ctx, r->hash, "dst_ip", r->dst_ip);
   }
   if (r->src_port != 0) { // optional
-    rule_uci_set_int(ctx, r->hash, "src_port", r->src_port);
+    rule_uci_set_int(pkg->ctx, r->hash, "src_port", r->src_port);
   }
   if (r->dst_port != 0) { // optional
-    rule_uci_set_int(ctx, r->hash, "dst_port", r->dst_port);
+    rule_uci_set_int(pkg->ctx, r->hash, "dst_port", r->dst_port);
   }
-  rule_uci_set_str(ctx, r->hash, "verdict", get_verdict_string(r->target)); // required
-  rule_uci_set_int(ctx, r->hash, "approved", 0); // required, always set to 0 because the user has not approved it yet
+  rule_uci_set_str(pkg->ctx, r->hash, "verdict", get_verdict_string(r->target)); // required
+  rule_uci_set_int(pkg->ctx, r->hash, "approved", 0); // required, always set to 0 because the user has not approved it yet
+
+
+  // PRINT OUT ALL SECTIONS IN PACKAGE
+  print_sections(pkg);
 
   // save and commit changes
-  LOGV("Saving changes to config file");
-  ret = uci_save(ctx, pkg);
-  if (ret != UCI_OK) {
-    LOGW("Didn't properly save config file.");
-    uci_perror(ctx,""); // TODO: replace this with uci_get_errorstr() and use our own logging functions
-  }
+  //LOGV("Saving changes to config file");
+  //ret = uci_save(ctx, pkg);
+  //if (ret != UCI_OK) {
+  //  LOGW("Didn't properly save config file.");
+  //  uci_perror(ctx,""); // TODO: replace this with uci_get_errorstr() and use our own logging functions
+  //}
   LOGV("Committing changes to config file");
-  ret = uci_commit(ctx, &pkg, false); // false should be true, library got it backwards
+  ret = uci_commit(pkg->ctx, &pkg, false); // false should be true, library got it backwards
   if (ret != UCI_OK) {
     LOGW("Didn't properly commit config file.");
-    uci_perror(ctx,""); // TODO: replace this with uci_get_errorstr() and use our own logging functions
+    uci_perror(pkg->ctx,""); // TODO: replace this with uci_get_errorstr() and use our own logging functions
   }
   LOGV("Done adding rule to config file");
+
+  // PRINT OUT ALL SECTIONS IN PACKAGE
+  print_sections(pkg);
 
   // unlock the config file
   LOGV("Unlocking config file");
