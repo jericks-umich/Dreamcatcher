@@ -356,7 +356,7 @@ function reject_rule_general()
                                 os.execute("/sbin/fw3 reload-dreamcatcher")                                                                                                                       
                         end                                                                                                                               
                 else                                                                                                                                                                              
-                        if (x:delete("dreamcatcher",accept_rule)) then                                                                                                                            
+                        if (x:delete("dreamcatcher",reject_rule)) then                                                                                                                            
                                 local name = getMD5(string)                                                                                                                                       
                                 x:set("dreamcatcher",name,"rule")                                                                                                                                 
                                 if (message ~= "") then                                                                                                                                           
