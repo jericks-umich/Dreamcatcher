@@ -37,23 +37,23 @@ function Verdict_1()
                         if (message == nil or approved ~= '0') then                                                                                            
                                 http.redirect(luci.dispatcher.build_url("admin","security","rule","rules_1"))                                                  
                         else                                                                                                                                   
-								local content = "<tr>"                                                           
-                                .. "<td style=\"text-align:center\">"                               
-                                .. '<form style="margin:0px;display:inline" id="' .. id .. "accept" .. '" action="rule/rules_1" method="POST">'
-                                .. '<input type="hidden" name="accept" value="' .. id .. '"></input>'                                          
-                                .. '<input type="button" onclick="modify_rule(\'' .. id .. '\',\'accept\')" value="Accept"></input>'           
-                                .. '</form>'                                                                                                   
-                                .. "</td>"                                                                                                     
-                                .. "<td style=\"text-align:center\">"                                                                          
-                                .. '<form style="margin:0px;display:inline" id="' .. id .. "reject" .. '" action="rule/rules_1" method="POST">'
-                                .. '<input type="hidden" name="reject" value="' .. id .. '"></input>'                                          
-                                .. '<input type="button" onclick="modify_rule(\'' .. id .. '\',\'reject\')" value="Reject"></input>'           
-                                .. '</form>'                                                                                                   
-                                .. "</td>"                                                                                                     
-                                .. "</tr>"                                                                                                     
+				local content = "<tr>"                                                           
+                                                .. "<td style=\"text-align:center\">"                               
+                                                .. '<form style="margin:0px;display:inline" id="' .. id .. "accept" .. '" action="rule/rules_1" method="POST">'
+                                                .. '<input type="hidden" name="accept" value="' .. id .. '"></input>'                                          
+                                                .. '<input type="button" onclick="modify_rule(\'' .. id .. '\',\'accept\')" value="Accept"></input>'           
+                                                .. '</form>'                                                                                                   
+                                                .. "</td>"                                                                                                     
+                                                .. "<td style=\"text-align:center\">"                                                                          
+                                                .. '<form style="margin:0px;display:inline" id="' .. id .. "reject" .. '" action="rule/rules_1" method="POST">'
+                                                .. '<input type="hidden" name="reject" value="' .. id .. '"></input>'                                          
+                                                .. '<input type="button" onclick="modify_rule(\'' .. id .. '\',\'reject\')" value="Reject"></input>'           
+                                                .. '</form>'                                                                                                   
+                                                .. "</td>"                                                                                                     
+                                                .. "</tr>"                                                                                                     
                                 luci.template.render("admin_security/verdict_1",{                                                                              
                                         id = id,
-										message = message,                                                                                                     
+					message = message,                                                                                                     
                                         content = content                                                                                                      
                                 })                                                                                                                             
                         end                                                                                                                                    
@@ -89,32 +89,32 @@ function Verdict_2()
 						.. "</tr>"
 						.. "<tr>"
 						.. "<td style=\"text-align:center\">src_ip</td>"
-                        .. "<td style=\"text-align:center\">" .. (src_ip or "") .. "</td>"
+                                                .. "<td style=\"text-align:center\">" .. (src_ip or "") .. "</td>"
 						.. "</tr>"
-                        .. "<tr>"                                                                                                                                                   
-                        .. "<td style=\"text-align:center\">dst_ip</td>"                                                                                                                                        
-                        .. "<td style=\"text-align:center\">" .. (dst_ip or "") .. "</td>"                                                                                                                              
-                        .. "</tr>"
-                        .. "<tr>"                                                                                                                                                   
-                        .. "<td style=\"text-align:center\">src_port</td>"                                                                                                                                        
-                        .. "<td style=\"text-align:center\">" .. (src_port or "") .. "</td>"                                                                                                                              
-                        .. "</tr>"
-                        .. "<tr>"                                                                                                                                                   
-                        .. "<td style=\"text-align:center\">dst_port</td>"                                                                                                                                        
-                        .. "<td style=\"text-align:center\">" .. (dst_port or "") .. "</td>"                                                                                                                              
-                        .. "</tr>"                                                                                                                               
+                                                .. "<tr>"                                                                                                                                                   
+                                                .. "<td style=\"text-align:center\">dst_ip</td>"                                                                                                                                        
+                                                .. "<td style=\"text-align:center\">" .. (dst_ip or "") .. "</td>"                                                                                                                              
+                                                .. "</tr>"
+                                                .. "<tr>"                                                                                                                                                   
+                                                .. "<td style=\"text-align:center\">src_port</td>"                                                                                                                                        
+                                                .. "<td style=\"text-align:center\">" .. (src_port or "") .. "</td>"                                                                                                                              
+                                                .. "</tr>"
+                                                .. "<tr>"                                                                                                                                                   
+                                                .. "<td style=\"text-align:center\">dst_port</td>"                                                                                                                                        
+                                                .. "<td style=\"text-align:center\">" .. (dst_port or "") .. "</td>"                                                                                                                              
+                                                .. "</tr>"                                                                                                                               
 						.. "<tr>"
 						.. "<td style=\"text-align:center\">"                                                                                                                                                   
-                        .. '<form style="margin:0px;display:inline" id="' .. id .. "accept" .. '" action="rule/rules_2" method="POST">'                                                                     
-                        .. '<input type="hidden" name="accept" value="' .. id .. '"></input>'                                                                                                   
-                        .. '<input type="button" onclick="modify_rule(\'' .. id .. '\',\'accept\')" value="Accept"></input>'                                                                    
-                        .. '</form>'
+                                                .. '<form style="margin:0px;display:inline" id="' .. id .. "accept" .. '" action="rule/rules_2" method="POST">'                                                                     
+                                		.. '<input type="hidden" name="accept" value="' .. id .. '"></input>'                                                                                                   
+                                		.. '<input type="button" onclick="modify_rule(\'' .. id .. '\',\'accept\')" value="Accept"></input>'                                                                    
+                                		.. '</form>'
 						.. "</td>"
 						.. "<td style=\"text-align:center\">"                                                                                                                                                                
-                        .. '<form style="margin:0px;display:inline" id="' .. id .. "reject" .. '" action="rule/rules_2" method="POST">'                                                                     
-                        .. '<input type="hidden" name="reject" value="' .. id .. '"></input>'                                                                                                   
-                        .. '<input type="button" onclick="modify_rule(\'' .. id .. '\',\'reject\')" value="Reject"></input>'                                                                    
-                        .. '</form>'
+                                		.. '<form style="margin:0px;display:inline" id="' .. id .. "reject" .. '" action="rule/rules_2" method="POST">'                                                                     
+                                		.. '<input type="hidden" name="reject" value="' .. id .. '"></input>'                                                                                                   
+                                		.. '<input type="button" onclick="modify_rule(\'' .. id .. '\',\'reject\')" value="Reject"></input>'                                                                    
+                                		.. '</form>'
 						.. "</td>"
 						.. "</tr>"
 				luci.template.render("admin_security/verdict_2",{
@@ -132,20 +132,28 @@ function Device_page()
 	if http_method == "POST" then
 		local dname = http.formvalue("device_name")
 		local delete = http.formvalue("delete_device")
+		local message = ""
 		if dname~=nil then
-			add_devices()
+			message = add_devices()
 		elseif delete ~= nil then
 			delete_devices()
 		end
+		luci.template.render("admin_security/password",{
+			TODO = message,
+			table_text = GenerateTable(),
+			physports = getphysports()
+		})
 	elseif http_method == "GET" then
 		luci.template.render("admin_security/password",{
 			TODO = "",
-			table_text = GenerateTable()
+			table_text = GenerateTable(),
+			physports = getphysports()
 		})
 	else
 		luci.template.render("admin_security/password",{
 			TODO = "",
-			table_text = GenerateTable()
+			table_text = GenerateTable(),
+			physports = getphysports()
 		})
 	end
 end
@@ -205,7 +213,6 @@ function accept_rule_advanced()
 		x:set("dreamcatcher",accept_rule,"approved","1")
 		x:set("dreamcatcher",accept_rule,"verdict","ACCEPT")
 		x:commit("dreamcatcher")
-		os.execute("/sbin/fw3 reload-dreamcatcher")
 	end
 end
 
@@ -216,7 +223,6 @@ function reject_rule_advanced()
                 x:set("dreamcatcher",reject_rule,"approved","1")                                                                       
                 x:set("dreamcatcher",reject_rule,"verdict","REJECT")                                                                   
                 x:commit("dreamcatcher")                                                                                               
-                os.execute("/sbin/fw3 reload-dreamcatcher")
         end
 end
 
@@ -260,7 +266,6 @@ function accept_rule_general()
 			x:set("dreamcatcher",name,"approved","1")
 			x:set("dreamcatcher",name,"verdict","ACCEPT")
 			x:commit("dreamcatcher")
-			os.execute("/sbin/fw3 reload-dreamcatcher")
 		end
 	end
 end
@@ -304,8 +309,7 @@ function reject_rule_general()
                         end                                                                                                            
                         x:set("dreamcatcher",name,"approved","1")                                                                      
                         x:set("dreamcatcher",name,"verdict","REJECT")                                                                  
-                        x:commit("dreamcatcher") 
-                        os.execute("/sbin/fw3 reload-dreamcatcher")                                                                                      
+                        x:commit("dreamcatcher")                                                                                       
                 end                                                                                                                    
         end                                                                                                                            
 end               
@@ -602,7 +606,6 @@ function delete_rule()
 	local x=luci.model.uci.cursor()
 	if(x:delete("dreamcatcher",delete_rule)) then
 		x:commit("dreamcatcher")	
-		os.execute("/sbin/fw3 reload-dreamcatcher")
 	end
 end
 
@@ -716,7 +719,6 @@ function add_rule()
 		x:set("dreamcatcher",name,"approved","0")    	
 	end
 	x:commit("dreamcatcher")
-	os.execute("/sbin/fw3 reload-dreamcatcher")
 end
 
 function add_devices()
@@ -770,9 +772,7 @@ function add_devices()
                 file:write('\t\tTunnel-Private-Group-ID = "' .. tostring(GroupID) .. '",\n')                                                                                                      
                 file:write('\t\tReply-Message = "Hello, %{User-Name}",\n')                                                                                                                        
                 file:write('\t\tFall-Through = Yes\n\n')                                                                                                                                            
-                file:close()
-                os.execute("killall radiusd") -- restart and reload not implemented 
-                os.execute("/etc/init.d/radiusd start")                                                                                                                                                                      
+                file:close()                                                                                                                                                                      
                 message = message .. '<pre><span class="inner-pre" style="font-size:20px">Device name: ' 
 			.. dname ..  "<br><br>Password: " 
 			.. password:sub(1,4) .. " "
@@ -785,14 +785,21 @@ function add_devices()
 	else                                                                                                                                                                                      
         		message = '<pre><span class="inner-pre" style="font-size:20px">Duplicate device name or resubmision of the same form</span></pre>'                                                                                                      
         end                                                                                                                                                                                       
-        luci.template.render("admin_security/password",{                                                                                                                                          
-        	TODO = message,                                                                                                                                                                   
-                table_text = GenerateTable()                                                                                                                                                      
-        })
+	return message
 end
 
 function GetDeviceName(vlan)                                                                                                           
-        local dname = ""                                                                                                               
+        local x = luci.model.uci.cursor()
+	if (vlan == '5' or vlan == 5) then
+		return x:get("physports",1,"name")
+	elseif (vlan == '6' or vlan == 6) then
+		return x:get("physports",2,"name")
+	elseif (vlan == '7' or vlan == 7) then
+		return x:get("physports",3,"name")
+	elseif (vlan == '8' or vlan == 8) then
+                return x:get("physports",4,"name")                                                                                                                                                
+	end
+	local dname = ""                                                                                                               
         local vlan_line = 'Tunnel-Private-Group-ID = "' .. vlan  .. '"'                                                        
 	local file = io.open("/etc/freeradius2/users","r")                                                                             
         for line in file:lines() do                                                                                                    
@@ -840,7 +847,6 @@ function delete_devices()
 						if (src_vlan == vlan or dst_vlan == vlan) then
 							if(x:delete("dreamcatcher",IcName)) then
 								x:commit("dreamcatcher")
-								os.execute("/sbin/fw3 reload-dreamcatcher")
 							end
 						end
 					end) 
@@ -853,12 +859,6 @@ function delete_devices()
 	local writefile = io.open("/etc/freeradius2/users","w")
 	writefile:write(wfile)
 	writefile:close()
-	os.execute("killall radiusd") -- restart and reload not implemented 
-    os.execute("/etc/init.d/radiusd start")
-	luci.template.render("admin_security/password",{
-		TODO = "",
-		table_text = GenerateTable()
-	})
 end
 
 function GeneratePassword(length)
@@ -929,4 +929,23 @@ function getMD5(string_input)
 	handle:close()
 	local md5 = string.sub(result,1,32)
 	return md5
+end
+
+function getphysports()
+	local table_content = ""
+	table_content = "<table style=\"width:100%;margin:0px\">"
+			.. "<tr>" 
+			.. "<td>" .. GetDeviceName(5) .. "</td>"
+			.. "</tr>"
+			.. "<tr>"
+			.. "<td>" .. GetDeviceName(6) .. "</td>"
+			.. "</tr>"
+			.. "<tr>"                                                                                                                                                                             
+                        .. "<td>" .. GetDeviceName(7) .. "</td>"                                                                                                   
+                        .. "</tr>"
+			.. "<tr>"                                                                                                                                                                             
+                        .. "<td>" .. GetDeviceName(8) .. "</td>"                                                                                                   
+                        .. "</tr>"
+			.. "</table>"
+	return table_content
 end
