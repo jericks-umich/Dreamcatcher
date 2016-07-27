@@ -168,7 +168,8 @@ unsigned int get_dst_vlan(struct nfq_data *tb) {
   return (unsigned int) strtol(vlan_ptr, NULL, 10); // returns 0 if unable to convert to integer
 }
 
-void add_rule(struct nfq_data *tb) {
+// returns -1 on failure, 0 on success
+int add_rule(struct nfq_data *tb) {
 	int ret;
 	protocol proto = 0;
 	unsigned char *data;
@@ -194,7 +195,7 @@ void add_rule(struct nfq_data *tb) {
 	ret = nfq_get_payload(tb, &data);
 	if (ret < 0) {
 		LOGD("empty packet. nothing to do here...");
-		return;
+		return -1;
 	}
 	ip = (struct ip*) data;
 	// check if ipv4 or ipv6
@@ -249,13 +250,16 @@ void add_rule(struct nfq_data *tb) {
   set_message(&new_rule);
 
   // write the rule to the config file
-  write_rule(&new_rule);
+  ret = write_rule(&new_rule);
+  if (ret == 0) { // if success
+    // pass the new rule to conductor
+    LOGD("Pushing the rule to the conductor's queue.");
+    push_rule_to_queue(&new_rule);
+  } else {
+    LOGD("Could not write rule to the config file.");
+  }
 
-  // pass the new rule to conductor
-  LOGD("Pushing the rule to the conductor's queue.");
-  push_rule_to_queue(&new_rule);
-
-	return;
+	return ret;
 }
 
 void print_pkt (struct nfq_data *tb)
@@ -375,11 +379,13 @@ int cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struct nfq_data *nfa, vo
   } else {
     LOGW("Cannot parse packet. Not sure what to do!");
   }
+  print_pkt(nfa);
+  ret = add_rule(nfa);
+  if (ret == 0) { // if there is a new rule added
+    reload_firewall();
+  }
   ret = nfq_set_verdict(qh, id, NF_DROP, 0, NULL);
   LOGD("Set DROP verdict. Return value: %d", ret);
-  print_pkt(nfa);
-  add_rule(nfa);
-  reload_firewall();
   return ret;
 }
 
@@ -399,6 +405,7 @@ int main(int argc, char **argv)
 	struct nfnl_handle *nh;
 	int fd;
 	int rv;
+  int ret;
 	char buf[4096] __attribute__ ((aligned));
   pthread_t conductor_thread;
 
@@ -443,7 +450,8 @@ int main(int argc, char **argv)
 	fd = nfq_fd(h);
 	while ((rv = recv(fd, buf, sizeof(buf), 0)) && rv >= 0) {
 		LOGV("pkt received");
-		nfq_handle_packet(h, buf, rv);
+		ret = nfq_handle_packet(h, buf, rv);
+    LOGV("nfq_handle_packet returns %d", ret);
 	}
   LOGD("Quitting because we received %d: %s", rv, strerror(errno));
 	LOGV("unbinding from queue %d", QUEUE_NUM);
