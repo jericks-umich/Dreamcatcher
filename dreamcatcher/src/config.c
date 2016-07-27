@@ -111,10 +111,11 @@ void print_sections(struct uci_package* pkg) {
 }
   
 // input: the rule to be written to config file
-// return: 0 on success, -1 on failure
+// return: 0 on success, nonzero on failure
 int write_rule(rule* r) {
   int fd;
   int ret;
+  int lock_ret;
   int tries = 0;
 
   struct uci_context* ctx;
@@ -158,40 +159,44 @@ int write_rule(rule* r) {
   }
 
   // PRINT OUT ALL SECTIONS IN PACKAGE
-  print_sections(pkg);
+  //print_sections(pkg);
 
   // calculate hash of rule for its id
   hash_rule(r); // now r->hash stores the unique id for this rule
+
+  // see if this rule already exists
+  if (rule_exists(ctx, r->hash)) {
+    LOGV("Rule for %s already exists.", r->hash);
+    ret = -1;
+    goto cleanup;
+  }
+
   // create new entry/section
-  add_new_named_rule_section(pkg->ctx, r->hash);
+  add_new_named_rule_section(ctx, r->hash);
   // populate section
-  rule_uci_set_str(pkg->ctx, r->hash, "message", r->message); // required
-  rule_uci_set_int(pkg->ctx, r->hash, "title", r->title); // required
+  rule_uci_set_str(ctx, r->hash, "message", r->message); // required
+  rule_uci_set_int(ctx, r->hash, "title", r->title); // required
   if (r->src_vlan != 0) { // optional
-    rule_uci_set_int(pkg->ctx, r->hash, "src_vlan", r->src_vlan);
+    rule_uci_set_int(ctx, r->hash, "src_vlan", r->src_vlan);
   }
   if (r->dst_vlan != 0) { // optional
-    rule_uci_set_int(pkg->ctx, r->hash, "dst_vlan", r->dst_vlan);
+    rule_uci_set_int(ctx, r->hash, "dst_vlan", r->dst_vlan);
   }
-  rule_uci_set_str(pkg->ctx, r->hash, "proto", get_protocol_string(r->proto)); // required
+  rule_uci_set_str(ctx, r->hash, "proto", get_protocol_string(r->proto)); // required
   if (strncmp(r->src_ip, "\0", sizeof(r->src_ip)) != 0) { // optional
-    rule_uci_set_str(pkg->ctx, r->hash, "src_ip", r->src_ip);
+    rule_uci_set_str(ctx, r->hash, "src_ip", r->src_ip);
   }
   if (strncmp(r->dst_ip, "\0", sizeof(r->dst_ip)) != 0) { // optional
-    rule_uci_set_str(pkg->ctx, r->hash, "dst_ip", r->dst_ip);
+    rule_uci_set_str(ctx, r->hash, "dst_ip", r->dst_ip);
   }
   if (r->src_port != 0) { // optional
-    rule_uci_set_int(pkg->ctx, r->hash, "src_port", r->src_port);
+    rule_uci_set_int(ctx, r->hash, "src_port", r->src_port);
   }
   if (r->dst_port != 0) { // optional
-    rule_uci_set_int(pkg->ctx, r->hash, "dst_port", r->dst_port);
+    rule_uci_set_int(ctx, r->hash, "dst_port", r->dst_port);
   }
-  rule_uci_set_str(pkg->ctx, r->hash, "verdict", get_verdict_string(r->target)); // required
-  rule_uci_set_int(pkg->ctx, r->hash, "approved", 0); // required, always set to 0 because the user has not approved it yet
-
-
-  // PRINT OUT ALL SECTIONS IN PACKAGE
-  print_sections(pkg);
+  rule_uci_set_str(ctx, r->hash, "verdict", get_verdict_string(r->target)); // required
+  rule_uci_set_int(ctx, r->hash, "approved", 0); // required, always set to 0 because the user has not approved it yet
 
   // save and commit changes
   //LOGV("Saving changes to config file");
@@ -201,29 +206,38 @@ int write_rule(rule* r) {
   //  uci_perror(ctx,""); // TODO: replace this with uci_get_errorstr() and use our own logging functions
   //}
   LOGV("Committing changes to config file");
-  ret = uci_commit(pkg->ctx, &pkg, false); // false should be true, library got it backwards
+  ret = uci_commit(ctx, &pkg, false); // false should be true, library got it backwards
   if (ret != UCI_OK) {
     LOGW("Didn't properly commit config file.");
-    uci_perror(pkg->ctx,""); // TODO: replace this with uci_get_errorstr() and use our own logging functions
+    uci_perror(ctx,""); // TODO: replace this with uci_get_errorstr() and use our own logging functions
   }
   LOGV("Done adding rule to config file");
 
-  // PRINT OUT ALL SECTIONS IN PACKAGE
-  print_sections(pkg);
-
+cleanup:
   // unlock the config file
   LOGV("Unlocking config file");
-  ret = -1;
-  for (tries = 0; ret == -1 && tries < MAX_TRIES; tries++) {
-    ret = unlock_close_config(fd);
+  lock_ret = -1;
+  for (tries = 0; lock_ret == -1 && tries < MAX_TRIES; tries++) {
+    lock_ret = unlock_close_config(fd);
   }
-  if (ret == -1) {
+  if (lock_ret == -1) {
     LOGE("Could not unlock or close config file.");
-    exit(1);
+    return 1;
   }
+
+  return ret;
 }
 
-void add_new_named_rule_section(struct uci_context *ctx, const char* hash) {
+// returns 1 if exists, 0 if not
+int rule_exists(struct uci_context* ctx, const char* hash) {
+  struct uci_ptr ptr;
+  char ptr_string[128];
+  snprintf(ptr_string, sizeof(ptr_string), "dreamcatcher.%s", hash);
+  uci_lookup_ptr(ctx, &ptr, ptr_string, false);
+  return (ptr.s != NULL); // true if the target exists (ptr.s having a value means there's a pointer to an actual section struct)
+}
+
+void add_new_named_rule_section(struct uci_context* ctx, const char* hash) {
   struct uci_ptr ptr;
   char ptr_string[128];
   snprintf(ptr_string, sizeof(ptr_string), "dreamcatcher.%s=rule", hash);
@@ -231,7 +245,7 @@ void add_new_named_rule_section(struct uci_context *ctx, const char* hash) {
   uci_set(ctx, &ptr);
 }
 
-void rule_uci_set_int(struct uci_context *ctx, const char* hash, const char* option, const unsigned int value) {
+void rule_uci_set_int(struct uci_context* ctx, const char* hash, const char* option, const unsigned int value) {
   struct uci_ptr ptr;
   char ptr_string[128];
   sprintf(ptr_string, "dreamcatcher.%s.%s=%d", hash, option, value);

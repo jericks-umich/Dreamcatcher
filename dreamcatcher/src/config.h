@@ -80,9 +80,11 @@ int write_rule(rule* r);
 void clean_config();
 int lock_open_config();
 int unlock_close_config();
-void add_new_named_rule_section(struct uci_context *ctx, const char* hash);
-void rule_uci_set_int(struct uci_context *ctx, const char* hash, const char* option, const unsigned int value);
-void rule_uci_set_str(struct uci_context *ctx, const char* hash, const char* option, const char* value);
+
+int rule_exists(struct uci_context* ctx, const char* hash);
+void add_new_named_rule_section(struct uci_context* ctx, const char* hash);
+void rule_uci_set_int(struct uci_context* ctx, const char* hash, const char* option, const unsigned int value);
+void rule_uci_set_str(struct uci_context* ctx, const char* hash, const char* option, const char* value);
 
 void initialize_rule_queue();
 int push_rule_to_queue(rule* r);
