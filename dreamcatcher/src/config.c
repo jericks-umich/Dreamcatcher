@@ -21,18 +21,18 @@
 #define MAX_TRIES 3
 
 void set_message(rule* r) {
-  switch (r->title) {
-    case (DIRECT):
+  switch (r->type) {
+    case (UNICAST):
       snprintf(r->message, sizeof(r->message), "%d wants to send messages to %d", r->src_vlan, r->dst_vlan);
-      break;
-    case (DISCOVER):
-      snprintf(r->message, sizeof(r->message), "%d wants to discover devices on your network", r->src_vlan);
-      break;
-    case (ADVERTISE):
-      snprintf(r->message, sizeof(r->message), "%d wants to tell other devices on your network about itself", r->src_vlan);
       break;
     case (BROADCAST):
       snprintf(r->message, sizeof(r->message), "%d wants to broadcast messages to your network", r->src_vlan);
+      break;
+    case (DISCOVER):
+      snprintf(r->message, sizeof(r->message), "%d wants to discover services on your network", r->src_vlan);
+      break;
+    case (ADVERTISE):
+      snprintf(r->message, sizeof(r->message), "%d wants to advertise itself on your network as %s", r->src_vlan, r->device_name);
       break;
     default:
       snprintf(r->message, sizeof(r->message), "Someone's trying to talk to someone. Please use advanced mode to view the specific details.");
@@ -53,6 +53,9 @@ void print_uci_ptr(struct uci_ptr* p) {
 
 char* get_verdict_string(verdict v) {
   switch (v) {
+    case UNSPEC:
+      LOGW("Verdict string requested for unspecified verdict.");
+      return NULL;
     case ACCEPT:
       return "ACCEPT";
     case DROP:
@@ -71,7 +74,7 @@ void hash_rule(rule* r) {
   char hash_string[512] = "\0";
   // create string to be hashed
   // required
-  snprintf(hash_string, sizeof(hash_string)-1, "%stitle%d",    hash_string, r->title);
+  snprintf(hash_string, sizeof(hash_string)-1, "%stype%d", hash_string, r->type);
   if (r->src_vlan != 0) {
     snprintf(hash_string, sizeof(hash_string)-1, "%ssrc_vlan%d", hash_string, r->src_vlan);
   }
@@ -79,18 +82,21 @@ void hash_rule(rule* r) {
     snprintf(hash_string, sizeof(hash_string)-1, "%sdst_vlan%d", hash_string, r->dst_vlan);
   }
   // required
-  snprintf(hash_string, sizeof(hash_string)-1, "%sproto%s",    hash_string, get_protocol_string(r->proto));
-  if (strncmp(r->src_ip, "\0", sizeof(r->src_ip)) != 0) {
-    snprintf(hash_string, sizeof(hash_string)-1, "%ssrc_ip%s",   hash_string, r->src_ip);
+  snprintf(hash_string, sizeof(hash_string)-1, "%sproto%s", hash_string, get_protocol_string(r->proto));
+  if (strncmp(r->src_ip, "\0", IP_ADDR_LEN) != 0) {
+    snprintf(hash_string, sizeof(hash_string)-1, "%ssrc_ip%s", hash_string, r->src_ip);
   }
-  if (strncmp(r->dst_ip, "\0", sizeof(r->dst_ip)) != 0) {
-    snprintf(hash_string, sizeof(hash_string)-1, "%sdst_ip%s",   hash_string, r->dst_ip);
+  if (strncmp(r->dst_ip, "\0", IP_ADDR_LEN) != 0) {
+    snprintf(hash_string, sizeof(hash_string)-1, "%sdst_ip%s", hash_string, r->dst_ip);
   }
   if (r->src_port != 0) {
     snprintf(hash_string, sizeof(hash_string)-1, "%ssrc_port%d", hash_string, r->src_port);
   }
   if (r->dst_port != 0) {
     snprintf(hash_string, sizeof(hash_string)-1, "%sdst_port%d", hash_string, r->dst_port);
+  }
+  if (strncmp(r->device_name, "\0", DEVICE_NAME_SIZE) != 0) {
+    snprintf(hash_string, sizeof(hash_string)-1, "%sdevice_name%s", hash_string, r->device_name);
   }
   // take MD5 hash
   MD5(hash_string, strlen(hash_string), hash_bytes);
@@ -121,6 +127,23 @@ int write_rule(rule* r) {
   struct uci_context* ctx;
   struct uci_package* pkg;
 
+  // print out the rule to be written
+  LOGV("New rule:");
+  LOGV("type:        %u", r->type);
+  LOGV("src_vlan:    %u", r->src_vlan);
+  LOGV("dst_vlan:    %u", r->dst_vlan);
+  LOGV("protonum:    %u", r->proto);
+  LOGV("protocol:    %s", get_protocol_string(r->proto));
+  LOGV("src_ip:      %s", r->src_ip);
+  LOGV("dst_ip:      %s", r->dst_ip);
+  LOGV("src_port:    %u", r->src_port);
+  LOGV("dst_port:    %u", r->dst_port);
+  LOGV("target:      %d", r->target);
+  LOGV("device_name: %s", r->device_name);
+
+  // calculate hash of rule for its id
+  hash_rule(r); // now r->hash stores the unique id for this rule
+
   // lock the config file
   LOGV("Locking config file");
   fd = -1;
@@ -131,19 +154,6 @@ int write_rule(rule* r) {
     LOGE("Could not open or lock config file.");
     exit(1);
   }
-
-  // print out the rule to be written
-  LOGV("New rule:");
-  LOGV("title:    %u", r->title);
-  LOGV("src_vlan: %u", r->src_vlan);
-  LOGV("dst_vlan: %u", r->dst_vlan);
-  LOGV("protonum: %u", r->proto);
-  LOGV("protocol: %s", get_protocol_string(r->proto));
-  LOGV("src_ip:   %s", r->src_ip);
-  LOGV("dst_ip:   %s", r->dst_ip);
-  LOGV("src_port: %u", r->src_port);
-  LOGV("dst_port: %u", r->dst_port);
-  LOGV("target:   %d", r->target);
 
   // write the rule out to the config file
   // initialize
@@ -161,9 +171,6 @@ int write_rule(rule* r) {
   // PRINT OUT ALL SECTIONS IN PACKAGE
   //print_sections(pkg);
 
-  // calculate hash of rule for its id
-  hash_rule(r); // now r->hash stores the unique id for this rule
-
   // see if this rule already exists
   if (rule_exists(ctx, r->hash)) {
     LOGV("Rule for %s already exists.", r->hash);
@@ -172,10 +179,14 @@ int write_rule(rule* r) {
   }
 
   // create new entry/section
-  add_new_named_rule_section(ctx, r->hash);
+  if (r->type >= DISCOVER) { // if a dpi_rule
+    add_new_named_rule_section(ctx, r->hash, 1); // dpi == true
+  } else {
+    add_new_named_rule_section(ctx, r->hash, 0); // dpi == false
+  }
   // populate section
   rule_uci_set_str(ctx, r->hash, "message", r->message); // required
-  rule_uci_set_int(ctx, r->hash, "title", r->title); // required
+  rule_uci_set_int(ctx, r->hash, "type", r->type); // required
   if (r->src_vlan != 0) { // optional
     rule_uci_set_int(ctx, r->hash, "src_vlan", r->src_vlan);
   }
@@ -183,10 +194,10 @@ int write_rule(rule* r) {
     rule_uci_set_int(ctx, r->hash, "dst_vlan", r->dst_vlan);
   }
   rule_uci_set_str(ctx, r->hash, "proto", get_protocol_string(r->proto)); // required
-  if (strncmp(r->src_ip, "\0", sizeof(r->src_ip)) != 0) { // optional
+  if (strncmp(r->src_ip, "\0", IP_ADDR_LEN) != 0) { // optional
     rule_uci_set_str(ctx, r->hash, "src_ip", r->src_ip);
   }
-  if (strncmp(r->dst_ip, "\0", sizeof(r->dst_ip)) != 0) { // optional
+  if (strncmp(r->dst_ip, "\0", IP_ADDR_LEN) != 0) { // optional
     rule_uci_set_str(ctx, r->hash, "dst_ip", r->dst_ip);
   }
   if (r->src_port != 0) { // optional
@@ -194,6 +205,9 @@ int write_rule(rule* r) {
   }
   if (r->dst_port != 0) { // optional
     rule_uci_set_int(ctx, r->hash, "dst_port", r->dst_port);
+  }
+  if (strncmp(r->device_name, "\0", DEVICE_NAME_SIZE) != 0) { // optional
+    rule_uci_set_str(ctx, r->hash, "device_name", r->device_name);
   }
   rule_uci_set_str(ctx, r->hash, "verdict", get_verdict_string(r->target)); // required
   rule_uci_set_int(ctx, r->hash, "approved", 0); // required, always set to 0 because the user has not approved it yet
@@ -237,10 +251,14 @@ int rule_exists(struct uci_context* ctx, const char* hash) {
   return (ptr.s != NULL); // true if the target exists (ptr.s having a value means there's a pointer to an actual section struct)
 }
 
-void add_new_named_rule_section(struct uci_context* ctx, const char* hash) {
+void add_new_named_rule_section(struct uci_context* ctx, const char* hash, int dpi_rule) {
   struct uci_ptr ptr;
   char ptr_string[128];
-  snprintf(ptr_string, sizeof(ptr_string), "dreamcatcher.%s=rule", hash);
+  if (dpi_rule) {
+    snprintf(ptr_string, sizeof(ptr_string), "dreamcatcher.%s=dpi_rule", hash);
+  } else {
+    snprintf(ptr_string, sizeof(ptr_string), "dreamcatcher.%s=rule", hash);
+  }
   uci_lookup_ptr(ctx, &ptr, ptr_string, false);
   uci_set(ctx, &ptr);
 }
@@ -259,6 +277,188 @@ void rule_uci_set_str(struct uci_context *ctx, const char* hash, const char* opt
   sprintf(ptr_string, "dreamcatcher.%s.%s=%s", hash, option, value);
   uci_lookup_ptr(ctx, &ptr, ptr_string, false);
   uci_set(ctx, &ptr);
+}
+
+// reads the question name from the payload and write it into buf
+void get_dns_question_name(unsigned char* payload, char* buf) {
+  unsigned char* ptr = payload;
+  int num_chars;
+  *buf = '\0'; // clear buf, just in case
+  // iterate until we reach a null byte
+  while (*ptr != 0) {
+    snprintf(buf, DEVICE_NAME_SIZE, "%s%.*s", buf, *ptr, (ptr+1)); // append next segment of device name
+    ptr += ((*ptr) + 1); // ptr points at the number of characters in this segment of the name, so move it to the end of the segment
+    if (*ptr != 0) { // if we're going to add another segment
+      snprintf(buf, DEVICE_NAME_SIZE, "%s.", buf); // append a '.' character between segments
+    }
+  }
+}
+
+// returns 1 if rule already exists, 0 if not
+// sets verdict to NF_ACCEPT if existing rule specifies ACCEPT target
+// sets rule.device_name if a new ADVERTISE rule needs to be made
+int check_dpi_rule(rule* r, dns_header* dns, unsigned char* payload, u_int32_t* verdict) {
+  int fd;
+  int ret;
+  int load_ret;
+  int lock_ret;
+  int tries = 0;
+
+  struct uci_context* ctx;
+  struct uci_package* pkg;
+  struct uci_element* e;
+
+  if (dns->questions > 0) {
+    get_dns_question_name(payload, r->device_name);
+  } else {
+    LOGW("No questions to query!");
+    // TODO: check the first answer then?
+  }
+  LOGV("This dns packet refers to %s", r->device_name);
+
+  if (r->type != ADVERTISE) { // only the ADVERTISE rules should have the device name
+    *r->device_name = '\0'; // zero it out
+  }
+
+  // calculate hash of rule for its id
+  hash_rule(r); // now r->hash stores the unique id for this rule
+
+
+  LOGV("Checking existing DPI rules to see if they match this packet.");
+
+  // lock the config file
+  LOGV("Locking config file");
+  fd = -1;
+  for (tries = 0; fd == -1 && tries < MAX_TRIES; tries++) {
+    fd = lock_open_config();
+  }
+  if (fd == -1) {
+    LOGE("Could not open or lock config file.");
+    return 1; // not sure what to do here, for now just say the rule exists (default block) and do nothing
+  }
+
+  // initialize uci context for dreamcatcher file
+  LOGV("Initializing config file context");
+  ctx = uci_alloc_context();
+  if (!ctx) {
+    LOGW("Didn't properly initialize context");
+  }
+  load_ret = uci_load(ctx, "dreamcatcher", &pkg); // config file loaded into pkg
+  if (load_ret != UCI_OK) {
+    LOGW("Didn't properly load config file");
+    uci_perror(ctx,""); // TODO: replace this with uci_get_errorstr() and use our own logging functions
+  }
+
+  ret = dpi_rule_exists(ctx, r->hash, verdict); // verdict is set if rule is found
+  LOGV("Rule already exists: %d", ret);
+
+  // unlock the config file
+  LOGV("Unlocking config file");
+  lock_ret = -1;
+  for (tries = 0; lock_ret == -1 && tries < MAX_TRIES; tries++) {
+    lock_ret = unlock_close_config(fd);
+  }
+  if (lock_ret == -1) {
+    LOGE("Could not unlock or close config file.");
+    return 1; // not sure what to do here, for now just say the rule exists (default block) and do nothing
+  }
+
+  return ret;
+}
+
+// returns 1 if exists, 0 if not
+// if rule exists, sets verdict
+int dpi_rule_exists(struct uci_context* ctx, const char* hash, u_int32_t* verdict) {
+  struct uci_ptr ptr;
+  char ptr_string[128];
+  struct uci_parse_option popt = {"verdict",0};
+  struct uci_option* opt;
+
+  snprintf(ptr_string, sizeof(ptr_string), "dreamcatcher.%s", hash);
+  uci_lookup_ptr(ctx, &ptr, ptr_string, false);
+  if (ptr.s == NULL) { // false if the target exists (ptr.s having a value means there's a pointer to an actual section struct)
+    return 0;
+  }
+  // find verdict
+  uci_parse_section(ptr.s, &popt, 1, &opt); // finds verdict and puts it in opt
+  LOGV("existing rule: %s -> %s", opt->e.name, opt->v.string);
+  if (strncmp("ACCEPT", opt->v.string, sizeof("ACCEPT")) == 0) { // if verdict is ACCEPT
+    *verdict = NF_ACCEPT;
+    LOGD("Accepting dpi rule.");
+  } // else leave to default NF_DROP
+  return 1;
+}
+
+
+// this function is usused now, leaving for now but can probably be removed
+void clean_config() {
+  int ret;
+  int fd;
+  int tries = 0;
+  struct uci_context* ctx;
+  struct uci_package* pkg;
+  struct uci_element* rule_ptr;
+  struct uci_ptr ptr;
+  char* ptr_string;
+
+  // lock the config file
+  LOGV("Locking config file");
+  fd = -1;
+  for (tries = 0; fd == -1 && tries < MAX_TRIES; tries++) {
+    fd = lock_open_config();
+  }
+  if (fd == -1) {
+    LOGE("Could not open or lock config file.");
+    exit(1);
+  }
+
+  LOGV("Prepping to read config file");
+  // prep for reading config file
+  ctx = uci_alloc_context();
+  if (!ctx) {
+    LOGW("Didn't properly initialize context");
+  }
+  ret = uci_load(ctx, "dreamcatcher", &pkg); // config file loaded into pkg
+  if (ret != UCI_OK) {
+    LOGW("Didn't properly load config file");
+    uci_perror(ctx,""); // TODO: replace this with uci_get_errorstr() and use our own logging functions
+  }
+  // delete any and all rule entries
+  LOGV("Deleting rule entries from config file");
+  ptr_string = strdup("dreamcatcher.@rule[-1]");
+  uci_lookup_ptr(ctx, &ptr, ptr_string, true); // get first rule
+  while (ptr.s != NULL) {
+    uci_delete(ctx, &ptr); // remove rule
+    free(ptr_string);
+    ptr_string = strdup("dreamcatcher.@rule[-1]");
+    uci_lookup_ptr(ctx, &ptr, ptr_string, true); // get first rule
+  }
+  free(ptr_string);
+  // save and commit changes
+  LOGV("Saving changes to config file");
+  ret = uci_save(ctx, pkg);
+  if (ret != UCI_OK) {
+    LOGW("Didn't properly save config file.");
+    uci_perror(ctx,""); // TODO: replace this with uci_get_errorstr() and use our own logging functions
+  }
+  LOGV("Committing changes to config file");
+  ret = uci_commit(ctx, &pkg, false); // false should be true, library got it backwards
+  if (ret != UCI_OK) {
+    LOGW("Didn't properly commit config file.");
+    uci_perror(ctx,""); // TODO: replace this with uci_get_errorstr() and use our own logging functions
+  }
+  LOGV("Done cleaning config file");
+
+  // unlock the config file
+  LOGV("Unlocking config file");
+  ret = -1;
+  for (tries = 0; ret == -1 && tries < MAX_TRIES; tries++) {
+    ret = unlock_close_config();
+  }
+  if (ret == -1) {
+    LOGE("Could not unlock or close config file.");
+    exit(1);
+  }
 }
 
 // return fd if successful, -1 if failed
