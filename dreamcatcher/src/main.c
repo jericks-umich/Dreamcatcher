@@ -168,9 +168,39 @@ unsigned int get_dst_vlan(struct nfq_data *tb) {
   return (unsigned int) strtol(vlan_ptr, NULL, 10); // returns 0 if unable to convert to integer
 }
 
-// returns -1 on failure, 0 on success
-int add_rule(struct nfq_data *tb) {
+void print_dns(dns_header* d) {
+  LOGV("Printing dns packet.");
+  LOGV("id: %u", d->id);
+  //LOGV("qr: %u", (d->flags & (1 << 15)) >> 15);
+  //LOGV("opcode: %u", (d->flags & (15 << 11)) >> 11);
+  //LOGV("aa: %u", (d->flags & (1 << 10)) >> 10);
+  //LOGV("tc: %u", (d->flags & (1 << 9)) >> 9);
+  //LOGV("rd: %u", (d->flags & (1 << 8)) >> 8);
+  //LOGV("ra: %u", (d->flags & (1 << 7)) >> 7);
+  //LOGV("z: %u", (d->flags & (1 << 6)) >> 6);
+  //LOGV("ad: %u", (d->flags & (1 << 5)) >> 5);
+  //LOGV("cd: %u", (d->flags & (1 << 4)) >> 4);
+  //LOGV("rcode: %u", d->flags & 16);
+  LOGV("qr: %u", d->qr);
+  LOGV("opcode: %u", d->opcode);
+  LOGV("aa: %u", d->aa);
+  LOGV("tc: %u", d->tc);
+  LOGV("rd: %u", d->rd);
+  LOGV("ra: %u", d->ra);
+  LOGV("z: %u", d->z);
+  LOGV("ad: %u", d->ad);
+  LOGV("cd: %u", d->cd);
+  LOGV("rcode: %u", d->rcode);
+  LOGV("questions: %u", d->questions);
+  LOGV("answer_rr: %u", d->answer_rr);
+  LOGV("authority_rr: %u", d->authority_rr);
+  LOGV("additional_rr: %u", d->additional_rr);
+}
+
+// returns 0 on new (non-dpi_)rule added, -1 if new rule not added, (and 1 if a dpi_rule was added)
+int add_rule(struct nfq_data *tb, u_int32_t* verdict) {
 	int ret;
+  int dpi_rule_exists;
 	protocol proto = 0;
 	unsigned char *data;
 	struct ip* ip;
@@ -178,9 +208,15 @@ int add_rule(struct nfq_data *tb) {
 	struct tcphdr* tcp;
 	struct udphdr* udp;
 	struct icmphdr* icmp;
+  dns_header* dns;
   
   rule new_rule;
   memset(&new_rule, 0, sizeof(new_rule)); // zero out all fields
+
+  // logic to determine type of packet and how we want to handle it
+  // default type = UNICAST
+  // this will get reassigned to another type if the packet meets certain conditions
+  new_rule.type = UNICAST; // %s wants to communicate with %s
 
   /////////////
   // Layer 2 //
@@ -202,10 +238,11 @@ int add_rule(struct nfq_data *tb) {
 	switch (ip->ip_v) { // ip version
 		case 4:
 			proto = ip->ip_p; // get protocol from ipv4 header
-			data = data + (4 * ip->ip_hl); // increment data pointer to next header
+			data = data + (4 * ip->ip_hl); // increment data pointer to layer 4 header
 			//print_ipv4(ip);
 			break;
 		case 6:
+      // ipv6 is disabled in the build, so this should never happen
 			ipv6 = (struct ip6_hdr*) data;
 			proto = -1; // TODO: find protocol in ipv6 header
 			data = data + (4 * 0); // TODO: find end of ipv6 header and advance data to next header
@@ -214,6 +251,15 @@ int add_rule(struct nfq_data *tb) {
 		default:
 			LOGD("Unknown Layer 3 protocol: %hhu. Not handled.",ip->ip_v);
 	}
+
+  // Check if BROADCAST traffic
+  // TODO: make this flexible so it works if network is not a /24
+  if ((ip->ip_dst.s_addr & 255) == 255) { // if last octet is .255
+    new_rule.type = BROADCAST; // set type to broadcast
+    strncpy(new_rule.dst_ip, inet_ntoa(ip->ip_dst), sizeof(new_rule.dst_ip)); // add filter based on ip address
+    new_rule.dst_vlan = 0; // unset dst_vlan so that one rule manages packets that can be allowed/blocked from any device
+  }
+
 	/////////////
 	// Layer 4 //
 	/////////////
@@ -226,12 +272,37 @@ int add_rule(struct nfq_data *tb) {
 			break;
 		case UDP :
 			udp = (struct udphdr*) data;
+      data = data + sizeof(*udp); // UDP header is always 8 bytes
       new_rule.proto = UDP;
       //if (ip->ip_v == 4) {
       //  strncpy(new_rule.src_ip, inet_ntoa(ip->ip_src), sizeof(new_rule.src_ip));
       //}
       //new_rule.src_port = (unsigned int) udp->uh_sport;
       new_rule.dst_port = (unsigned int) udp->uh_dport;
+      
+      // Check if mDNS/link-local traffic
+      if ((new_rule.dst_port == 5353)) {
+        new_rule.dst_vlan = 0; // remove dst_vlan since we allow link-local traffic to be multicast or unicast the same way
+        dns = (dns_header*) data;
+        data = data + sizeof(*dns); // data now points at the start of questions variable-length field
+        print_dns(dns);
+        // check if DISCOVER or ADVERTISE traffic (Query/Response bit is first bit of 3rd byte in payload)
+        if (dns->qr == 0) { // DISCOVER
+          new_rule.type = DISCOVER;
+        } else { // ADVERTISE
+          new_rule.type = ADVERTISE;
+        }
+        // check against existing dpi_rule set for ALLOW/BLOCK verdict
+        dpi_rule_exists = check_dpi_rule(&new_rule, dns, data, verdict);
+        // if dpi_rule already exists
+          // verdict already set above in check_dpi_rule()
+          // return early without creating a new rule
+        if (dpi_rule_exists) {
+          return -1; // no new rule added
+        }
+        // else
+          // proceed to create new rule (do nothing)
+      }
 			break;
 		case ICMP : 
 			icmp = (struct icmphdr*) data;
@@ -240,14 +311,14 @@ int add_rule(struct nfq_data *tb) {
 			//case SCTP : // not implemented (yet?)
 		default :
 			LOGD("Unknown protocol %hhu. Not handled.", proto);
+      return -1; // don't add a new rule, but still block this packet
 	}
+
+  // set new_rule.target to REJECT by default if we're making a new rule
   new_rule.target = REJECT;
 
-  // logic to determine type of packet and how we want to handle it
-  // TODO
-  // default title type = 0
-  new_rule.title = 0; // %s wants to communicate with %s
-  set_message(&new_rule);
+  // we're not setting the message anymore
+  //set_message(&new_rule);
 
   // write the rule to the config file
   ret = write_rule(&new_rule);
@@ -257,6 +328,10 @@ int add_rule(struct nfq_data *tb) {
     push_rule_to_queue(&new_rule);
   } else {
     LOGD("Could not write rule to the config file.");
+  }
+  
+  if (ret == 0 && new_rule.type >= DISCOVER) { // if this is a dpi_rule, 
+    ret = 1; // don't reload firewall rules, since iptables doesn't handle dpi rules
   }
 
 	return ret;
@@ -373,6 +448,7 @@ int cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struct nfq_data *nfa, vo
   LOGV("Got callback!");
   int ret;
   int id;
+  u_int32_t verdict = NF_DROP;
 	struct nfqnl_msg_packet_hdr *ph = nfq_get_msg_packet_hdr(nfa);
 	if (ph) {
 		id = ntohl(ph->packet_id);
@@ -380,12 +456,12 @@ int cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struct nfq_data *nfa, vo
     LOGW("Cannot parse packet. Not sure what to do!");
   }
   print_pkt(nfa);
-  ret = add_rule(nfa);
-  if (ret == 0) { // if there is a new rule added
+  ret = add_rule(nfa, &verdict); // may change verdict to NF_ACCEPT in some cases, otherwise default NF_DROP
+  if (ret == 0) { // if there is a new (non-dpi_)rule added
     reload_firewall();
   }
-  ret = nfq_set_verdict(qh, id, NF_DROP, 0, NULL);
-  LOGD("Set DROP verdict. Return value: %d", ret);
+  ret = nfq_set_verdict(qh, id, verdict, 0, NULL);
+  LOGD("Set %d verdict(%d is ACCEPT, %d is DROP). Return value: %d", verdict, NF_ACCEPT, NF_DROP, ret);
   return ret;
 }
 
