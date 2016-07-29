@@ -3,7 +3,6 @@
 #include <unistd.h>
 #include <string.h>
 #include <errno.h>
-#include <pthread.h>
 
 #include <netinet/in.h>
 #include <linux/types.h>
@@ -16,12 +15,12 @@
 #include <netinet/tcp.h>
 #include <netinet/udp.h>
 #include <netinet/ip_icmp.h>
+#include <curl/curl.h>
 
 #include <main.h>
 #include <protocols.h>
 #include <config.h>
 #include <logger.h>
-#include <conductor.h>
 
 #define TAG "MAIN"
 
@@ -253,8 +252,8 @@ int add_rule(struct nfq_data *tb) {
   ret = write_rule(&new_rule);
   if (ret == 0) { // if success
     // pass the new rule to conductor
-    LOGD("Pushing the rule to the conductor's queue.");
-    push_rule_to_queue(&new_rule);
+    LOGD("Alerting user");
+    alert_user();
   } else {
     LOGD("Could not write rule to the config file.");
   }
@@ -368,6 +367,38 @@ void print_icmp(struct icmphdr* i) {
 	LOGV("Rest of header:  0x%x", (unsigned int)i->un.gateway); // just grabbing any union field
 }
 
+void alert_user() {
+  int ret = 0;
+
+  struct curl_slist* headers = NULL;
+  char* key_header = "Authorization: key=AIzaSyCkzLOzVdzLj_FLh2Y2X2k4cKfRt0L8TsQ";
+  char* target = "fpD5nXntW30:APA91bHLzpJlld0XlmLeXZ1qssw1cm0w6FK5rAytZDkI8Bcb06ysVMCD8Gw_nhpoHEAT2H7DMBIz6OCd7D7RhGIZ3zU3CnbTZf0E7zf2rxjqKQZ0ES8kOp8vzQqg1S1Un-HwPkJHwLQE";
+
+  headers = curl_slist_append(headers,"Accept: application/json");
+  headers = curl_slist_append(headers,"Content-Type:application/json");
+  headers = curl_slist_append(headers,key_header);
+
+  char jsonObj[1024];
+  snprintf(jsonObj, sizeof(jsonObj), 
+      "{ \
+        \"data\": \
+        { \
+          \"title\" : \"Go to Router Interface\", \
+          \"message\" : \"You have new pending rules\", \
+        }, \
+        \"to\" : \"%s\" \
+      }", target);
+
+  LOGD("message: %s", jsonObj);
+  CURL *curl = curl_easy_init();
+  curl_easy_setopt(curl,CURLOPT_URL,"https://gcm-http.googleapis.com/gcm/send");
+  curl_easy_setopt(curl,CURLOPT_POSTFIELDS,jsonObj);
+  curl_easy_setopt(curl,CURLOPT_HTTPHEADER,headers);
+  ret = curl_easy_perform(curl);
+  LOGD("ret = %d", ret);
+  curl_easy_cleanup(curl);
+}
+
 int cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struct nfq_data *nfa, void *data)
 {
   LOGV("Got callback!");
@@ -407,17 +438,11 @@ int main(int argc, char **argv)
 	int rv;
   int ret;
 	char buf[4096] __attribute__ ((aligned));
-  pthread_t conductor_thread;
 
   // clear out any previous temporary rules -- we don't have state for them anymore -- need to recreate them if we want them again
   //clean_config();
   // reload firewall
   //reload_firewall();
-
-  // initialize rule_queue
-  initialize_rule_queue();
-  // create new thread for conducting new rules to google/client application
-  rv = pthread_create(&conductor_thread, NULL, &conduct, NULL);
 
   // create handle to nfqueue and watch for new packets to handle
 	LOGV("opening library handle");
@@ -459,8 +484,6 @@ int main(int argc, char **argv)
 	LOGV("closing library handle");
 	nfq_close(h);
 
-  // TODO: do some signal handling to detect early close
-  pthread_cancel(conductor_thread);
   free(rule_queue);
 
 	exit(0);

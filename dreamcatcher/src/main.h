@@ -25,11 +25,12 @@ unsigned int get_dst_vlan(struct nfq_data *tb);
 int add_rule(struct nfq_data *tb);
 void print_pkt (struct nfq_data *tb);
 void reload_firewall();
-int cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struct nfq_data *nfa, void *data);
-int main(int argc, char **argv);
 void print_tcp(struct tcphdr* t);
 void print_udp(struct udphdr* u);
 void print_icmp(struct icmphdr* i);
+void alert_user();
+int cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struct nfq_data *nfa, void *data);
+int main(int argc, char **argv);
 
 
 #endif // DREAMCATCHER_H

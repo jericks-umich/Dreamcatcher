@@ -261,77 +261,6 @@ void rule_uci_set_str(struct uci_context *ctx, const char* hash, const char* opt
   uci_set(ctx, &ptr);
 }
 
-// this function is usused now, leaving for now but can probably be removed
-void clean_config() {
-  int ret;
-  int fd;
-  int tries = 0;
-  struct uci_context* ctx;
-  struct uci_package* pkg;
-  struct uci_element* rule_ptr;
-  struct uci_ptr ptr;
-  char* ptr_string;
-
-  // lock the config file
-  LOGV("Locking config file");
-  fd = -1;
-  for (tries = 0; fd == -1 && tries < MAX_TRIES; tries++) {
-    fd = lock_open_config();
-  }
-  if (fd == -1) {
-    LOGE("Could not open or lock config file.");
-    exit(1);
-  }
-
-  LOGV("Prepping to read config file");
-  // prep for reading config file
-  ctx = uci_alloc_context();
-  if (!ctx) {
-    LOGW("Didn't properly initialize context");
-  }
-  ret = uci_load(ctx, "dreamcatcher", &pkg); // config file loaded into pkg
-  if (ret != UCI_OK) {
-    LOGW("Didn't properly load config file");
-    uci_perror(ctx,""); // TODO: replace this with uci_get_errorstr() and use our own logging functions
-  }
-  // delete any and all rule entries
-  LOGV("Deleting rule entries from config file");
-  ptr_string = strdup("dreamcatcher.@rule[-1]");
-  uci_lookup_ptr(ctx, &ptr, ptr_string, true); // get first rule
-  while (ptr.s != NULL) {
-    uci_delete(ctx, &ptr); // remove rule
-    free(ptr_string);
-    ptr_string = strdup("dreamcatcher.@rule[-1]");
-    uci_lookup_ptr(ctx, &ptr, ptr_string, true); // get first rule
-  }
-  free(ptr_string);
-  // save and commit changes
-  LOGV("Saving changes to config file");
-  ret = uci_save(ctx, pkg);
-  if (ret != UCI_OK) {
-    LOGW("Didn't properly save config file.");
-    uci_perror(ctx,""); // TODO: replace this with uci_get_errorstr() and use our own logging functions
-  }
-  LOGV("Committing changes to config file");
-  ret = uci_commit(ctx, &pkg, false); // false should be true, library got it backwards
-  if (ret != UCI_OK) {
-    LOGW("Didn't properly commit config file.");
-    uci_perror(ctx,""); // TODO: replace this with uci_get_errorstr() and use our own logging functions
-  }
-  LOGV("Done cleaning config file");
-
-  // unlock the config file
-  LOGV("Unlocking config file");
-  ret = -1;
-  for (tries = 0; ret == -1 && tries < MAX_TRIES; tries++) {
-    ret = unlock_close_config();
-  }
-  if (ret == -1) {
-    LOGE("Could not unlock or close config file.");
-    exit(1);
-  }
-}
-
 // return fd if successful, -1 if failed
 // block until we get a handle
 int lock_open_config() {
@@ -361,7 +290,7 @@ int lock_open_config() {
   return fd;
 }
 
-int unlock_close_config(int fd) {
+int unlock_close_config(int fd) { 
   struct flock fl;
   int retval = 0;
 
@@ -372,9 +301,9 @@ int unlock_close_config(int fd) {
   fl.l_len = 0;
 
   // unlock file
-  if (fcntl(fd, F_SETLKW, &fl) == -1) {
+  if (fcntl(fd, F_SETLKW, &fl) == -1) { 
     LOGW("Error unlocking config file.");
-    retval = -1;
+    retval = -1; 
   }
 
   // close file descriptor
@@ -382,59 +311,4 @@ int unlock_close_config(int fd) {
 
   return retval;
 }
-
-void initialize_rule_queue() {
-  rule_queue = calloc(RULE_QUEUE_SIZE, sizeof(rule));
-  lock = calloc(1, sizeof(pthread_mutex_t));
-  pthread_mutex_init(lock, NULL);
-  start = rule_queue;
-  end = rule_queue;
-}
-
-// pass a filled rule struct to be pushed
-int push_rule_to_queue(rule* r) {
-  LOGV("PUSH RULE");
-  acquire_lock();
-  if (((end+1) - start) % (RULE_QUEUE_SIZE*sizeof(rule)) == 0) { // failure condition
-    LOGV("can't push, full");
-    release_lock();
-    return -1; // do not push
-  }
-  memcpy(end, r, sizeof(rule));
-  end += 1;
-  if ((end - rule_queue) > RULE_QUEUE_SIZE*sizeof(rule)) {
-    end -= RULE_QUEUE_SIZE;
-  }
-  release_lock();
-  return 0;
-}
-
-// pass a blank rule struct to be filled
-int pop_rule_from_queue(rule* r) {
-  LOGV("POP RULE");
-  acquire_lock();
-  if (start == end) {
-    release_lock();
-    return -1; // do not pop, empty
-  }
-  memcpy(r, start, sizeof(rule));
-  start += 1;
-  if ((start - rule_queue) > RULE_QUEUE_SIZE*sizeof(rule)) {
-    start -= RULE_QUEUE_SIZE;
-  }
-  release_lock();
-  return 0;
-}
-
-void acquire_lock() {
-  pthread_mutex_lock(lock);
-}
-
-void release_lock() {
-  pthread_mutex_unlock(lock);
-}
-
-
-
-
 

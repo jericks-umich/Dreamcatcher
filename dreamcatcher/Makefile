@@ -34,8 +34,7 @@ define Build/Compile
 		$(PKG_BUILD_DIR)/main.c \
 		$(PKG_BUILD_DIR)/config.c \
 		$(PKG_BUILD_DIR)/logger.c \
-		$(PKG_BUILD_DIR)/protocols.c \
-		$(PKG_BUILD_DIR)/conductor.c
+		$(PKG_BUILD_DIR)/protocols.c
 endef
 
 define Package/dreamcatcher/install
