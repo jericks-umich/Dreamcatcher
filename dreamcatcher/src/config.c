@@ -284,14 +284,17 @@ void get_dns_question_name(unsigned char* payload, char* buf) {
   unsigned char* ptr = payload;
   int num_chars;
   *buf = '\0'; // clear buf, just in case
-  // iterate until we reach a null byte
-  while (*ptr != 0) {
-    snprintf(buf, DEVICE_NAME_SIZE, "%s%.*s", buf, *ptr, (ptr+1)); // append next segment of device name
-    ptr += ((*ptr) + 1); // ptr points at the number of characters in this segment of the name, so move it to the end of the segment
-    if (*ptr != 0) { // if we're going to add another segment
-      snprintf(buf, DEVICE_NAME_SIZE, "%s.", buf); // append a '.' character between segments
-    }
-  }
+  // METHOD 1 : get entire name
+  //// iterate until we reach a null byte
+  //while (*ptr != 0) {
+  //  snprintf(buf, DEVICE_NAME_SIZE, "%s%.*s", buf, *ptr, (ptr+1)); // append next segment of device name
+  //  ptr += ((*ptr) + 1); // ptr points at the number of characters in this segment of the name, so move it to the end of the segment
+  //  if (*ptr != 0) { // if we're going to add another segment
+  //    snprintf(buf, DEVICE_NAME_SIZE, "%s.", buf); // append a '.' character between segments
+  //  }
+  //}
+  // METHOD 2 : get name up to first .
+  snprintf(buf, DEVICE_NAME_SIZE, "%s%.*s", buf, *ptr, (ptr+1)); // append next segment of device name
 }
 
 // returns 1 if rule already exists, 0 if not
