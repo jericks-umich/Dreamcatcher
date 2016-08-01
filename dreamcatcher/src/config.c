@@ -3,9 +3,10 @@
 #include <string.h>
 #include <unistd.h>
 #include <fcntl.h>
-#include <pthread.h>
 
+#include <sys/types.h>
 #include <openssl/md5.h>
+#include <arpa/inet.h>
 
 #include <uci.h>
 
@@ -13,12 +14,16 @@
 #include <config.h>
 #include <logger.h>
 #include <protocols.h>
+#include <dns.h>
 
 #define TAG "CONFIG"
 
 #define CONFIG_FILE "/etc/config/dreamcatcher"
 
 #define MAX_TRIES 3
+
+// initialize global lock references to 0
+int lock_references = 0;
 
 void set_message(rule* r) {
   switch (r->type) {
@@ -266,7 +271,7 @@ void add_new_named_rule_section(struct uci_context* ctx, const char* hash, int d
 void rule_uci_set_int(struct uci_context* ctx, const char* hash, const char* option, const unsigned int value) {
   struct uci_ptr ptr;
   char ptr_string[128];
-  sprintf(ptr_string, "dreamcatcher.%s.%s=%d", hash, option, value);
+  snprintf(ptr_string, sizeof(ptr_string), "dreamcatcher.%s.%s=%d", hash, option, value);
   uci_lookup_ptr(ctx, &ptr, ptr_string, false);
   uci_set(ctx, &ptr);
 }
@@ -274,60 +279,155 @@ void rule_uci_set_int(struct uci_context* ctx, const char* hash, const char* opt
 void rule_uci_set_str(struct uci_context *ctx, const char* hash, const char* option, const char* value) {
   struct uci_ptr ptr;
   char ptr_string[128];
-  sprintf(ptr_string, "dreamcatcher.%s.%s=%s", hash, option, value);
+  snprintf(ptr_string, sizeof(ptr_string), "dreamcatcher.%s.%s=%s", hash, option, value);
   uci_lookup_ptr(ctx, &ptr, ptr_string, false);
   uci_set(ctx, &ptr);
 }
 
-// reads the question name from the payload and write it into buf
-void get_dns_question_name(unsigned char* payload, char* buf) {
-  unsigned char* ptr = payload;
-  int num_chars;
-  *buf = '\0'; // clear buf, just in case
-  // METHOD 1 : get entire name
-  //// iterate until we reach a null byte
-  //while (*ptr != 0) {
-  //  snprintf(buf, DEVICE_NAME_SIZE, "%s%.*s", buf, *ptr, (ptr+1)); // append next segment of device name
-  //  ptr += ((*ptr) + 1); // ptr points at the number of characters in this segment of the name, so move it to the end of the segment
-  //  if (*ptr != 0) { // if we're going to add another segment
-  //    snprintf(buf, DEVICE_NAME_SIZE, "%s.", buf); // append a '.' character between segments
-  //  }
-  //}
-  // METHOD 2 : get name up to first .
-  snprintf(buf, DEVICE_NAME_SIZE, "%s%.*s", buf, *ptr, (ptr+1)); // append next segment of device name
+// reads from ptr the dns name using dns's weird encoding
+// uses payload in case ptr refers to a location of a previous substring
+// TODO: support this ^^^
+// if not NULL, buf is filled with the resulting string
+// returns the length read, in bytes
+// NOTE: make sure this is the start of a question section, because this function cannot tell and will behave erratically if not
+// NOTE: This ONLY reads the name until it gets to a null byte. It does not include, for instance, the 4 bytes for QTYPE/QCLASS fields in a question
+unsigned int read_dns_name(unsigned char* payload, unsigned char* start, char* buf) {
+  int num_bytes = 0; // return value; can be set at any time if we hit a reference, or if we get to end, will be set
+  unsigned char* ptr = start;
+  u_int16_t offset; // offset into payload; used when we have a pointer
+  if (buf != NULL) {
+    *buf = '\0'; // clear buf, just in case
+  }
+  // iterate until we reach a null byte
+  while (*ptr != 0) {
+    // check if next segment is a reference
+    if ((*ptr & 192) == 192) { // it's a pointer if first two bits are set 0b11000000
+      // pointer is two bytes, network order
+      offset = *(ptr+1); // set to lower 8 bits
+      offset += ((*ptr & 191) << 8); // add upper 6 bits
+      if (num_bytes == 0) { // if num_bytes isn't set yet, aka this is the first pointer
+        num_bytes = (ptr+2) - start; // how many bytes has ptr gone?
+      }
+      ptr = payload + offset; // set ptr to next segment
+    } else { // not a pointer, so add next segment
+      if (buf != NULL) {
+        snprintf(buf, DEVICE_NAME_SIZE, "%s%.*s", buf, *ptr, (ptr+1)); // append next segment of device name
+      }
+      ptr += ((*ptr) + 1); // ptr points at the number of characters in this segment of the name, so move it to the end of the segment
+      if (buf != NULL && *ptr != 0) { // if we're going to add another segment
+        snprintf(buf, DEVICE_NAME_SIZE, "%s.", buf); // append a '.' character between segments
+      }
+    }
+  }
+  if (num_bytes == 0) { // if num_chars hasn't been set yet, aka there were no pointers in this name
+    // when ptr == '\0' to end the string, we need to move 1 byte more to get past it
+    num_bytes = (ptr+1) - start; // how many bytes has ptr gone?
+  }
+  if (num_bytes < 0) { // this should never happen, even if packet is invalid -- it means our arithmetic is off
+    LOGW("We have a bug! payload: 0x%x, start: 0x%x, ptr: 0x%x, buf: %s", payload, start, ptr, buf);
+    exit(-1);
+  }
+  return (unsigned int) num_bytes;
 }
 
-// returns 1 if rule already exists, 0 if not
-// sets verdict to NF_ACCEPT if existing rule specifies ACCEPT target
-// sets rule.device_name if a new ADVERTISE rule needs to be made
+// returns a pointer to after the dns question
+unsigned char* skip_question(unsigned char* p) {
+  unsigned char* ptr = p;
+  while (*ptr != 0) {
+    ptr += ((*ptr) + 1); // ptr points at the number of characters in this segment of the name, so move it to the end of the segment
+  }
+  // after the name is done, there are the QTYPE and QCLASS fields, each is 2 bytes
+  ptr += 4;
+  return ptr;
+}
+
+// parses a dns payload, reads all the answers, puts all the answers in result (which must be freed later)
+// result must be a pre-allocated char[2*N][M] where N is equal to dns->answer_rr and M is DEVICE_NAME_SIZE
+// SRV records can have multiple device names (the "name" and the "target") so we need 2x buffers for them -- the extras will go unused
+// returns 0 on success, -1 on failure
+int parse_dns_answers(dns_header* dns, unsigned char* payload, char** result) {
+  unsigned char* p = payload;
+  char buf[DEVICE_NAME_SIZE];
+  int name_length;
+  int ptr_found = 0;
+  u_int16_t type;
+  u_int16_t data_len;
+  // skip over the questions
+  for (int i = 0; i < dns->questions; i++) {
+    p = skip_question(p); // moves p forward past all the questions to the answers
+  } // p now points at the answer section of the dns record
+  // parse the answers and put them all in result (duplicates are fine for this rough draft, they just take up more time)
+  for (int i = 0; i < dns->answer_rr; i++) {
+    name_length = read_dns_name(payload, p, buf); // put name in buf
+    p += name_length; // move p forward to type section
+    type = ntohs(*(u_int16_t*)p); // translate from network byte order to host byte order
+    p += 8; // move p past the TYPE (2 bytes), CLASS (2 bytes), and TTL (4 bytes) fields
+    data_len = ntohs(*(u_int16_t*)p); // translate from network byte order to host byte order
+    // if type is A, AAAA, SRV, TXT, use response from read_dns_name as device name
+    // if type is PTR, SRV, read the RDATA field for the device name (or 2nd device name in case of SRV)
+    switch (type) {
+      case A :
+        snprintf(result[2*i], DEVICE_NAME_SIZE, "%s", strtok(buf, ".")); // this will mess up on strings that actually have an escaped '.' char
+        break;
+      case PTR :
+        read_dns_name(payload, p, buf); // first 6 bytes are priority, weight, port
+        snprintf(result[2*i], DEVICE_NAME_SIZE, "%s", strtok(buf, ".")); // this will mess up on strings that actually have an escaped '.' char
+        break;
+      case TXT :
+        snprintf(result[2*i], DEVICE_NAME_SIZE, "%s", strtok(buf, ".")); // this will mess up on strings that actually have an escaped '.' char
+        break;
+      case AAAA :
+        snprintf(result[2*i], DEVICE_NAME_SIZE, "%s", strtok(buf, ".")); // this will mess up on strings that actually have an escaped '.' char
+        break;
+      case SRV :
+        // set first device name as buf from above
+        snprintf(result[2*i], DEVICE_NAME_SIZE, "%s", strtok(buf, ".")); // this will mess up on strings that actually have an escaped '.' char
+        // set second device name as target field
+        read_dns_name(payload, p+6, buf); // first 6 bytes are priority, weight, port
+        snprintf(result[2*i+1], DEVICE_NAME_SIZE, "%s", strtok(buf, ".")); // this will mess up on strings that actually have an escaped '.' char
+        break;
+      default :
+        LOGW("Unsupported DNS answer type: %u", type);
+        return -1;
+    }
+    p += data_len; // move p past RDATA field, ready for next iteration
+  }
+  return 0;
+}
+
+
+// returns 1 if we create any new dpi_rules, -1 if we do not (returning 0 reloads the firewall, which we do not want to do)
+// sets verdict to NF_ACCEPT if all applicable existing rules specify ACCEPT target
+// sets rule.device_name for each device name (may create/check multiple rules) if a new ADVERTISE rule needs to be made
 int check_dpi_rule(rule* r, dns_header* dns, unsigned char* payload, u_int32_t* verdict) {
   int fd;
-  int ret;
+  int ret = -1; // default if we don't create any new rules
   int load_ret;
   int lock_ret;
+  int parse_ret;
+  int exists_ret;
+  int create_ret;
   int tries = 0;
+  u_int32_t flag = 1; // gets set to 0 if packet should be blocked
+  u_int32_t temp_verdict;
+  char buf[DEVICE_NAME_SIZE];
+  char names[dns->answer_rr*2][DEVICE_NAME_SIZE];
 
   struct uci_context* ctx;
   struct uci_package* pkg;
   struct uci_element* e;
 
-  if (dns->questions > 0) {
-    get_dns_question_name(payload, r->device_name);
-  } else {
-    LOGW("No questions to query!");
-    // TODO: check the first answer then?
+  if (dns->qr == 1) { // only the ADVERTISE rules should have the device name included in the rule
+    r->type = ADVERTISE;
+    parse_ret = parse_dns_answers(dns, payload, (char**) names); // populates names with names for new rules, some names will be empty
+    if (parse_ret == -1) {
+      return -1;
+    }
+  } else if (dns->qr == 0) { // if it's a discover packet
+    r->type = DISCOVER;
+    read_dns_name(payload, payload, buf); // log the question name, just because I'm curious
+    LOGV("This dns packet refers to %s", buf);
   }
-  LOGV("This dns packet refers to %s", r->device_name);
-
-  if (r->type != ADVERTISE) { // only the ADVERTISE rules should have the device name
-    *r->device_name = '\0'; // zero it out
-  }
-
-  // calculate hash of rule for its id
-  hash_rule(r); // now r->hash stores the unique id for this rule
-
-
-  LOGV("Checking existing DPI rules to see if they match this packet.");
 
   // lock the config file
   LOGV("Locking config file");
@@ -352,8 +452,56 @@ int check_dpi_rule(rule* r, dns_header* dns, unsigned char* payload, u_int32_t* 
     uci_perror(ctx,""); // TODO: replace this with uci_get_errorstr() and use our own logging functions
   }
 
-  ret = dpi_rule_exists(ctx, r->hash, verdict); // verdict is set if rule is found
-  LOGV("Rule already exists: %d", ret);
+  LOGV("Checking existing DPI rules to see if they match this packet.");
+  if (r->type == DISCOVER) {
+    // (re)calculate hash of rule
+    hash_rule(r); // now r->hash stores the unique id for this rule
+    exists_ret = dpi_rule_exists(ctx, r->hash, verdict); // verdict is set if rule is found
+    LOGV("Rule already exists: %d", exists_ret);
+    if (exists_ret == 0) { // if rule doesn't exist yet
+      // create new rule
+      create_ret = write_rule(r);
+      if (create_ret == 0) {
+        LOGD("Alerting user");
+        alert_user();
+        ret = 1;
+      } else {
+        LOGW("Could not write rule to the config file.");
+      }
+    }
+  } else if (r->type == ADVERTISE) {
+    // iterate over all the device names, check if their rules ALL exist AND say ACCEPT
+    for (int i = 0; i < dns->answer_rr*2; i++) {
+      if (strncmp(names[i], "\0", DEVICE_NAME_SIZE) == 0) { continue; } // skip empty names
+      strncpy(r->device_name, names[i], DEVICE_NAME_SIZE); // set device name to this name
+      LOGV("Checking if rule exists for device name %s", r->device_name);
+      // (re)calculate hash of rule
+      hash_rule(r); // now r->hash stores the unique id for this rule
+      // check if this rule exists
+      if (dpi_rule_exists(ctx, r->hash, &temp_verdict)) { // verdict is set if rule is found
+        LOGV("Device %s exists", r->device_name);
+        if (temp_verdict != NF_ACCEPT) { // if not all of the existing rules say ACCEPT
+          flag = 0;
+        }
+      } else { // rule does not already exist
+        LOGV("Device %s does not exist", r->device_name);
+        flag = 0; // we need to create at least one new rule because of this packet, so it should be blocked
+        // create new rule
+        create_ret = write_rule(r);
+        if (create_ret == 0) {
+          LOGD("Alerting user");
+          alert_user();
+          ret = 1;
+        } else {
+          LOGW("Could not write rule to the config file.");
+        }
+      }
+      if (flag == 1) { // if we never set flag to 0
+        LOGV("All devices existed in the dpi_rules and had ACCEPT rules, so we can ACCEPT this packet! Yay!");
+        *verdict = NF_ACCEPT; // then we can accept the packet! yay!
+      }
+    }
+  }
 
   // unlock the config file
   LOGV("Unlocking config file");
@@ -405,6 +553,11 @@ int lock_open_config() {
     return -1;
   }
 
+  if (lock_references > 0) { // if we already have a lock
+    LOGV("We already have at least one lock");
+    goto success_lock;
+  }
+
   // prep file lock
   fl.l_type = F_WRLCK;
   fl.l_whence = SEEK_SET;
@@ -417,13 +570,21 @@ int lock_open_config() {
     LOGW("Locking config file failed.");
     return -1;
   } 
+
+success_lock:
   // if it succeeds and we have a write lock
+  lock_references += 1;
   return fd;
 }
 
 int unlock_close_config(int fd) { 
   struct flock fl;
   int retval = 0;
+
+  if (lock_references > 1) { // if we have multiple lock_references
+    LOGV("We have more than one lock to release");
+    goto success_unlock;
+  }
 
   // prep file unlock
   fl.l_type = F_UNLCK;
@@ -437,9 +598,11 @@ int unlock_close_config(int fd) {
     retval = -1; 
   }
 
+success_unlock:
   // close file descriptor
   close(fd);
 
+  lock_references -= 1;
   return retval;
 }
 

@@ -2,11 +2,12 @@
 #define DREAMCATCHER_CONFIG_H
 
 #include <fcntl.h>
-#include <pthread.h>
+
+#include <sys/types.h>
 
 #include <uci.h>
 
-#include <main.h>
+#include <dns.h>
 #include <protocols.h>
 
 
@@ -73,12 +74,6 @@ typedef struct rule {
   
 } rule;
 
-#define RULE_QUEUE_SIZE 128
-rule* rule_queue;
-pthread_mutex_t* lock;
-rule* start; // point to places in rule_queue
-rule* end; // point to places in rule_queue
-
 void set_message(rule* r);
 char* get_verdict_string(verdict v);
 void hash_rule(rule* r);
@@ -91,7 +86,9 @@ void add_new_named_rule_section(struct uci_context* ctx, const char* hash, int d
 void rule_uci_set_int(struct uci_context* ctx, const char* hash, const char* option, const unsigned int value);
 void rule_uci_set_str(struct uci_context* ctx, const char* hash, const char* option, const char* value);
 
-void get_dns_question_name(unsigned char* payload, char* buf);
+unsigned int read_dns_name(unsigned char* payload, unsigned char* start, char* buf);
+unsigned char* skip_question(unsigned char* p);
+int parse_dns_answers(dns_header* dns, unsigned char* payload, char** result);
 int check_dpi_rule(rule* r, dns_header* dns, unsigned char* payload, u_int32_t* verdict);
 int dpi_rule_exists(struct uci_context* ctx, const char* hash, u_int32_t* verdict);
 

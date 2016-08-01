@@ -212,6 +212,9 @@ int add_rule(struct nfq_data *tb, u_int32_t* verdict) {
   rule new_rule;
   memset(&new_rule, 0, sizeof(new_rule)); // zero out all fields
 
+  // set new_rule.target to REJECT by default if we're making a new rule
+  new_rule.target = REJECT; // this will not change anything if we do not create a new rule or if we reuse this rule and hash it multiple times
+
   // logic to determine type of packet and how we want to handle it
   // default type = UNICAST
   // this will get reassigned to another type if the packet meets certain conditions
@@ -286,22 +289,11 @@ int add_rule(struct nfq_data *tb, u_int32_t* verdict) {
         dns = (dns_header*) data;
         data = data + sizeof(*dns); // data now points at the start of questions variable-length field
         print_dns(dns);
-        // check if DISCOVER or ADVERTISE traffic (Query/Response bit is first bit of 3rd byte in payload)
-        if (dns->qr == 0) { // DISCOVER
-          new_rule.type = DISCOVER;
-        } else { // ADVERTISE
-          new_rule.type = ADVERTISE;
-        }
         // check against existing dpi_rule set for ALLOW/BLOCK verdict
-        dpi_rule_exists = check_dpi_rule(&new_rule, dns, data, verdict);
-        // if dpi_rule already exists
-          // verdict already set above in check_dpi_rule()
-          // return early without creating a new rule
-        if (dpi_rule_exists) {
-          return -1; // no new rule added
-        }
-        // else
-          // proceed to create new rule (do nothing)
+        return check_dpi_rule(&new_rule, dns, data, verdict);
+        // check_dpi_rule will create any new dpi_rules, as necessary, and return according to this functions return spec
+          // verdict set in check_dpi_rule()
+          // will either return -1 or 1, -1 if no new rule created, 1 if new rule created (in either case, no need to reload firewall rules)
       }
 			break;
 		case ICMP : 
@@ -313,9 +305,6 @@ int add_rule(struct nfq_data *tb, u_int32_t* verdict) {
 			LOGI("Unknown protocol %hhu. Not handled.", proto);
       return -1; // don't add a new rule, but still block this packet
 	}
-
-  // set new_rule.target to REJECT by default if we're making a new rule
-  new_rule.target = REJECT;
 
   // we're not setting the message anymore
   //set_message(&new_rule);
@@ -560,8 +549,6 @@ int main(int argc, char **argv)
 	nfq_destroy_queue(qh);
 	LOGV("closing library handle");
 	nfq_close(h);
-
-  free(rule_queue);
 
 	exit(0);
 }
