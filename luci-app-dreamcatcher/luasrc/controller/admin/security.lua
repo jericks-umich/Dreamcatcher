@@ -224,13 +224,10 @@ function accept_rule_general()
 	local accept_rule = http.formvalue("accept")
 	local x = luci.model.uci.cursor()
 	if (x:get("dreamcatcher",accept_rule,"approved")=="0") then
-		local message = x:get("dreamcatcher",accept_rule,"message")
 		local src_vlan = x:get("dreamcatcher",accept_rule,"src_vlan")	
 		local dst_vlan = x:get("dreamcatcher",accept_rule,"dst_vlan")
 		local type = x:get("dreamcatcher",accept_rule,"type")
-		if (message == nil) then
-			message = ""
-		end
+		local dst_ip = x:get("dreamcatcher",accept_rule,"dst_ip")
 		if (src_vlan == nil) then
 			src_vlan = ""
 		end
@@ -240,8 +237,13 @@ function accept_rule_general()
 		if (type == nil) then
 			type = ""
 		end
-		local string = "type" .. type .. "src_vlan" .. src_vlan .. "dst_vlan" .. dst_vlan .. "proto"  .. "src_ip" 
+		if (dst_ip == nil) then
+			dst_ip = ""
+		end
+		local string_1 = "type" .. type .. "src_vlan" .. src_vlan .. "dst_vlan" .. dst_vlan .. "proto"  .. "src_ip" 
                                 .. "dst_ip" .. "src_port" .. "dst_port"  		
+		local string_2 = "type" .. type .. "src_vlan" .. src_vlan .. "dst_vlan" .. "proto"  .. "src_ip"                                                                                 
+                                .. "dst_ip" .. dst_ip .. "src_port" .. "dst_port"
 		if type == "0" then
 			local flag = false
 			x:foreach("dreamcatcher","rule",function(s)                                                                                            
@@ -255,12 +257,9 @@ function accept_rule_general()
 					end
 				end
 			end)
-			if flag == true then
-				local name = getMD5(string)                                                                                    
+			if (flag == true) then
+				local name = getMD5(string_1)                                                                                    
                                 x:set("dreamcatcher",name,"rule")                                                                              
-                                if (message ~= "") then                                                                                        
-                                        x:set("dreamcatcher",name,"message",message)                                                           
-                                end                                                                                                            
                                 if (src_vlan ~= "") then                                                                                       
                                         x:set("dreamcatcher",name,"src_vlan",src_vlan)                                                         
                                 end                                                                                                            
@@ -274,14 +273,9 @@ function accept_rule_general()
                                 x:set("dreamcatcher",name,"verdict","ACCEPT")                                                                  
                                 x:commit("dreamcatcher")                                                                                    
                                 os.execute("/sbin/fw3 reload-dreamcatcher")
-			end		
-		else
-			if (x:delete("dreamcatcher",accept_rule)) then
-				local name = getMD5(string)                                                                                            
+			elseif (x:delete("dreamcatcher",accept_rule)) then
+				local name = getMD5(string_1)                                                                                            
                 		x:set("dreamcatcher",name,"rule")   			
-				if (message ~= "") then
-					x:set("dreamcatcher",name,"message",message)
-				end
 				if (src_vlan ~= "") then
 					x:set("dreamcatcher",name,"src_vlan",src_vlan)
 				end
@@ -296,88 +290,188 @@ function accept_rule_general()
 				x:commit("dreamcatcher")
 				os.execute("/sbin/fw3 reload-dreamcatcher")
 			end
+		elseif type == "1" then
+			local flag = false
+			x:foreach("dreamcatcher","rule",function(s)
+				local IcName = s[".name"]
+				local vlan = x:get("dreamcatcher",IcName,"src_vlan")
+				local dst_ip_temp = x:get("dreamcatcher",IcName,"dst_ip")
+				local type_temp = x:get("dreamcatcher",IcName,"type")
+				if (vlan == src_vlan and dst_ip_temp == dst_ip and type_temp == type) then
+					if (x:delete("dreamcatcher",IcName)) then
+						flag = true
+					end
+				end
+			end)
+			if (flag == true) then
+				local name = getMD5(string_2)
+				x:set("dreamcatcher",name,"rule")
+				if (src_vlan ~= "") then
+					x:set("dreamcatcher",name,"src_vlan",src_vlan)
+				end
+				if (dst_ip ~= "") then
+					x:set("dreamcatcher",name,"dst_ip",dst_ip)
+				end
+				if (type ~= "") then
+					x:set("dreamcatcher",name,"type",type)
+				end
+				x:set("dreamcatcher",name,"approved","1")
+				x:set("dreamcatcher",name,"verdict","ACCEPT")
+				x:commit("dreamcatcher")                                                                                                                                                    
+                                os.execute("/sbin/fw3 reload-dreamcatcher")
+			elseif (x:delete("dreamcatcher",accept_rule)) then                                                                                                                                  
+                                local name = getMD5(string_2)                                                                                                                                               
+                                x:set("dreamcatcher",name,"rule")                                                                                                                                           
+                                if (src_vlan ~= "") then                                                                                                                                                    
+                                        x:set("dreamcatcher",name,"src_vlan",src_vlan)                                                                                                                      
+                                end                                                                                                                                                                         
+                                if (dst_ip ~= "") then                                                                                                                                                    
+                                        x:set("dreamcatcher",name,"dst_ip",dst_ip)                                                                                                                      
+                                end                                                                                                                                                                         
+                                if (type ~= "") then                                                                                                                                                        
+                                        x:set("dreamcatcher",name,"type",type)                                                                                                                              
+                                end                                                                                                                                                                         
+                                x:set("dreamcatcher",name,"approved","1")                                                                                                                                   
+                                x:set("dreamcatcher",name,"verdict","ACCEPT")                                                                                                                               
+                                x:commit("dreamcatcher")                                                                                                                                                    
+                                os.execute("/sbin/fw3 reload-dreamcatcher")                                                                                                                                 
+                        end
+		elseif (type == "2" or type == "3") then
+			if (x:get("dreamcatcher",accept_rule,"approved")=="0") then                                                                                                                                         
+                		x:set("dreamcatcher",accept_rule,"approved","1")                                                                                                                                            
+                		x:set("dreamcatcher",accept_rule,"verdict","ACCEPT")                                                                                                                                        
+                		x:commit("dreamcatcher")                                                                                                                                                                    
+                		os.execute("/sbin/fw3 reload-dreamcatcher")                                                                                                                                                 
+        		end				
 		end
 	end
 end
 
-function reject_rule_general()                                                                                                         
-        local reject_rule = http.formvalue("reject")                                                                                   
-        local x = luci.model.uci.cursor()                                                                                              
-        if (x:get("dreamcatcher",reject_rule,"approved")=="0") then                                                                    
-                local message = x:get("dreamcatcher",reject_rule,"message")                                                            
-                local src_vlan = x:get("dreamcatcher",reject_rule,"src_vlan")                                                          
-                local dst_vlan = x:get("dreamcatcher",reject_rule,"dst_vlan")                                                          
-                local type = x:get("dreamcatcher",reject_rule,"type")                                                                
-                if (message == nil) then                                                                                               
-                        message = ""                                                                                                   
-                end                                                                                                                    
-                if (src_vlan == nil) then                                                                                              
-                        src_vlan = ""                                                                                                  
-                end                                                                                                                    
-                if (dst_vlan == nil) then                                                                                              
-                        dst_vlan = ""                                                                                                  
-                end                                                                                                                    
-                if (type == nil) then                                                                                                 
-                        type = ""                                                                                                     
-                end                                                                                                                    
-                local string = "type" .. type .. "src_vlan" .. src_vlan .. "dst_vlan" .. dst_vlan .. "proto"  .. "src_ip"            
-                                .. "dst_ip" .. "src_port" .. "dst_port"                                                                
-		if type == "0" then                                                                                                                                                              
-                        local flag = false                                                                                                                                                        
-                        x:foreach("dreamcatcher","rule",function(s)                                                                                                                               
-                                local IcName = s[".name"]                                                                                                                                         
-                                local vlan1 = x:get("dreamcatcher",IcName,"src_vlan")                                                                                                             
-                                local vlan2 = x:get("dreamcatcher",IcName,"dst_vlan")                                                                                                             
-                                local type_temp = x:get("dreamcatcher",IcName,"type")                                                                                                           
-                                if (vlan1 == src_vlan and vlan2 == dst_vlan and type_temp == type) then                                                                                         
-                                        if (x:delete("dreamcatcher",IcName)) then                                                                                                                 
-                                                flag = true                                                                                                                                       
-                                        end                                                                                                                                                       
-                                end                                                                                                                                                               
-                        end)                                                                                                                                                                      
-                        if flag == true then                                                                                                                                                      
-                                local name = getMD5(string)                                                                                               
-                                x:set("dreamcatcher",name,"rule")                                                                                                                                 
-                                if (message ~= "") then                                                                                                   
-                                        x:set("dreamcatcher",name,"message",message)                                                                                                              
-                                end                                                                                                                                                               
-                                if (src_vlan ~= "") then                                                                                                                                          
-                                        x:set("dreamcatcher",name,"src_vlan",src_vlan)                                                                                                            
-                                end                                                                                                                                                               
-                                if (dst_vlan ~= "") then                                                                                                                                          
-                                        x:set("dreamcatcher",name,"dst_vlan",dst_vlan)                                                                                                            
-                                end                                                                                                                                                               
-                                if (type ~= "") then                                                                                                                                             
-                                        x:set("dreamcatcher",name,"type",type)                                                                          
-                                end                                                                                                                                                               
-                                x:set("dreamcatcher",name,"approved","1")                                                                                 
-                                x:set("dreamcatcher",name,"verdict","REJECT")                                                                                                                     
-                                x:commit("dreamcatcher")                                                                                       
-                                os.execute("/sbin/fw3 reload-dreamcatcher")                                                                                                                       
-                        end                                                                                                                               
-                else                                                                                                                                                                              
-                        if (x:delete("dreamcatcher",reject_rule)) then                                                                                                                            
-                                local name = getMD5(string)                                                                                                                                       
-                                x:set("dreamcatcher",name,"rule")                                                                                                                                 
-                                if (message ~= "") then                                                                                                                                           
-                                        x:set("dreamcatcher",name,"message",message)                                                                                                              
-                                end                                                                                                                                                               
-                                if (src_vlan ~= "") then                                                                                                                                          
-                                        x:set("dreamcatcher",name,"src_vlan",src_vlan)                                                                                                            
+function reject_rule_general()
+	local reject_rule = http.formvalue("reject")
+	local x = luci.model.uci.cursor()
+	if (x:get("dreamcatcher",reject_rule,"approved")=="0") then
+		local src_vlan = x:get("dreamcatcher",reject_rule,"src_vlan")	
+		local dst_vlan = x:get("dreamcatcher",reject_rule,"dst_vlan")
+		local type = x:get("dreamcatcher",reject_rule,"type")
+		local dst_ip = x:get("dreamcatcher",reject_rule,"dst_ip")
+		if (src_vlan == nil) then
+			src_vlan = ""
+		end
+		if (dst_vlan == nil) then
+			dst_vlan = ""
+		end
+		if (type == nil) then
+			type = ""
+		end
+		if (dst_ip == nil) then
+			dst_ip = ""
+		end
+		local string_1 = "type" .. type .. "src_vlan" .. src_vlan .. "dst_vlan" .. dst_vlan .. "proto"  .. "src_ip" 
+                                .. "dst_ip" .. "src_port" .. "dst_port"  		
+		local string_2 = "type" .. type .. "src_vlan" .. src_vlan .. "dst_vlan" .. "proto"  .. "src_ip"                                                                                 
+                                .. "dst_ip" .. dst_ip .. "src_port" .. "dst_port"
+		if type == "0" then
+			local flag = false
+			x:foreach("dreamcatcher","rule",function(s)                                                                                            
+                		local IcName = s[".name"]                                                                                                      
+                		local vlan1 = x:get("dreamcatcher",IcName,"src_vlan")
+				local vlan2 = x:get("dreamcatcher",IcName,"dst_vlan")
+				local type_temp = x:get("dreamcatcher",IcName,"type")
+				if (vlan1 == src_vlan and vlan2 == dst_vlan and type_temp == type) then
+					if (x:delete("dreamcatcher",IcName)) then
+						flag = true
+					end
+				end
+			end)
+			if (flag == true) then
+				local name = getMD5(string_1)                                                                                    
+                                x:set("dreamcatcher",name,"rule")                                                                              
+                                if (src_vlan ~= "") then                                                                                       
+                                        x:set("dreamcatcher",name,"src_vlan",src_vlan)                                                         
                                 end                                                                                                            
-                                if (dst_vlan ~= "") then                                                                                                                                          
-                                        x:set("dreamcatcher",name,"dst_vlan",dst_vlan)                                                                                                            
+                                if (dst_vlan ~= "") then                                                                                       
+                                        x:set("dreamcatcher",name,"dst_vlan",dst_vlan)                                                         
                                 end                                                                                                            
-                                if (type ~= "") then                                                                                                                                             
-                                        x:set("dreamcatcher",name,"type",type)                                                             
-                                end                                                                                                                                                               
-                                x:set("dreamcatcher",name,"approved","1")                                                                    
-                                x:set("dreamcatcher",name,"verdict","REJECT")                                                                                                                     
-                                x:commit("dreamcatcher")                                                                                                  
-                                os.execute("/sbin/fw3 reload-dreamcatcher")                                                                                                                       
-                        end                                                                                                                               
-                end        
-	end                                                                                                                            
+                                if (type ~= "") then                                                                                          
+                                        x:set("dreamcatcher",name,"type",type)                                                               
+                                end                                                                                                            
+                                x:set("dreamcatcher",name,"approved","1")                                                                      
+                                x:set("dreamcatcher",name,"verdict","REJECT")                                                                  
+                                x:commit("dreamcatcher")                                                                                    
+                                os.execute("/sbin/fw3 reload-dreamcatcher")
+			elseif (x:delete("dreamcatcher",reject_rule)) then
+				local name = getMD5(string_1)                                                                                            
+                		x:set("dreamcatcher",name,"rule")   			
+				if (src_vlan ~= "") then
+					x:set("dreamcatcher",name,"src_vlan",src_vlan)
+				end
+				if (dst_vlan ~= "") then
+					x:set("dreamcatcher",name,"dst_vlan",dst_vlan)
+				end
+				if (type ~= "") then
+					x:set("dreamcatcher",name,"type",type)
+				end
+				x:set("dreamcatcher",name,"approved","1")
+				x:set("dreamcatcher",name,"verdict","REJECT")
+				x:commit("dreamcatcher")
+				os.execute("/sbin/fw3 reload-dreamcatcher")
+			end
+		elseif type == "1" then
+			local flag = false
+			x:foreach("dreamcatcher","rule",function(s)
+				local IcName = s[".name"]
+				local vlan = x:get("dreamcatcher",IcName,"src_vlan")
+				local dst_ip_temp = x:get("dreamcatcher",IcName,"dst_ip")
+				local type_temp = x:get("dreamcatcher",IcName,"type")
+				if (vlan == src_vlan and dst_ip_temp == dst_ip and type_temp == type) then
+					if (x:delete("dreamcatcher",IcName)) then
+						flag = true
+					end
+				end
+			end)
+			if (flag == true) then
+				local name = getMD5(string_2)
+				x:set("dreamcatcher",name,"rule")
+				if (src_vlan ~= "") then
+					x:set("dreamcatcher",name,"src_vlan",src_vlan)
+				end
+				if (dst_ip ~= "") then
+					x:set("dreamcatcher",name,"dst_ip",dst_ip)
+				end
+				if (type ~= "") then
+					x:set("dreamcatcher",name,"type",type)
+				end
+				x:set("dreamcatcher",name,"approved","1")
+				x:set("dreamcatcher",name,"verdict","REJECT")
+				x:commit("dreamcatcher")                                                                                                                                                    
+                                os.execute("/sbin/fw3 reload-dreamcatcher")
+			elseif (x:delete("dreamcatcher",reject_rule)) then                                                                                                                                  
+                                local name = getMD5(string_2)                                                                                                                                               
+                                x:set("dreamcatcher",name,"rule")                                                                                                                                           
+                                if (src_vlan ~= "") then                                                                                                                                                    
+                                        x:set("dreamcatcher",name,"src_vlan",src_vlan)                                                                                                                      
+                                end                                                                                                                                                                         
+                                if (dst_ip ~= "") then                                                                                                                                                    
+                                        x:set("dreamcatcher",name,"dst_ip",dst_ip)                                                                                                                      
+                                end                                                                                                                                                                         
+                                if (type ~= "") then                                                                                                                                                        
+                                        x:set("dreamcatcher",name,"type",type)                                                                                                                              
+                                end                                                                                                                                                                         
+                                x:set("dreamcatcher",name,"approved","1")                                                                                                                                   
+                                x:set("dreamcatcher",name,"verdict","REJECT")                                                                                                                               
+                                x:commit("dreamcatcher")                                                                                                                                                    
+                                os.execute("/sbin/fw3 reload-dreamcatcher")                                                                                                                                 
+                        end
+		elseif (type == "2" or type == "3") then
+			if (x:get("dreamcatcher",reject_rule,"approved")=="0") then                                                                                                                                         
+                		x:set("dreamcatcher",reject_rule,"approved","1")                                                                                                                                            
+                		x:set("dreamcatcher",reject_rule,"verdict","REJECT")                                                                                                                                        
+                		x:commit("dreamcatcher")                                                                                                                                                                    
+                		os.execute("/sbin/fw3 reload-dreamcatcher")                                                                                                                                                 
+        		end				
+		end
+	end
 end               
 
 function advanced_perm_rule_table()
@@ -396,10 +490,106 @@ function advanced_perm_rule_table()
 	"</tr>"
 	x:foreach("dreamcatcher","rule",function(s)
 		local IcName = s[".name"]
-		local type = x:get("dreamcatcher",IcName,"approved")
-		if type == "1" then
+		local approved = x:get("dreamcatcher",IcName,"approved")
+		if approved == "1" then
 			flag = true
-			local message = x:get("dreamcatcher",IcName,"message")
+			permanent_table = permanent_table .. "<tr>"
+			local src_device = ""                                                                                                  
+                        local dst_device = ""                                                                                                  
+                        local device_name = ""                                                                                              
+                        local src_vlan = x:get("dreamcatcher",IcName,"src_vlan")                                                               
+                        if src_vlan == nil then                                                                                             
+                                src_device = "Unknown device"                                                                                  
+                        else                                                                                                                
+                                src_device = GetDeviceName(src_vlan)                                                                           
+                        end                                                                                                             
+                        local dst_vlan = x:get("dreamcatcher",IcName,"dst_vlan")                                                               
+                        if dst_vlan == nil then                                                                                                
+                                dst_device = "Unknown device"                                                                                  
+                        else                                                                                                                   
+                                dst_device = GetDeviceName(dst_vlan)                                                                           
+                        end                                                                                                                    
+                        local device_name = x:get("dreamcatcher",IcName,"device_name")                                                         
+                        if device_name == nil then                                                                                             
+                                device_name = "Unknown device"                                                                              
+                        end                                                                                                                    
+                        local type = x:get("dreamcatcher",IcName,"type")                                                                    
+                        local message = GetTitle(src_device,dst_device,device_name,type)
+			--local message = x:get("dreamcatcher",IcName,"message")
+			permanent_table = permanent_table .. "<td>" .. message .. "</td>\n"
+			local proto = x:get("dreamcatcher",IcName,"proto")
+			if proto ~= nil then
+				permanent_table = permanent_table .. "<td>" .. proto .. "</td>\n"
+			else
+	                        permanent_table = permanent_table .. "<td></td>\n"          
+			end
+			local src_ip = x:get("dreamcatcher",IcName,"src_ip")
+			if src_ip ~= nil then
+				permanent_table = permanent_table .. "<td>" .. src_ip .. "</td>\n"                                            
+	                else
+	                        permanent_table = permanent_table .. "<td></td>\n"          
+			end
+			local dst_ip = x:get("dreamcatcher",IcName,"dst_ip")                                                          
+	                if dst_ip ~= nil then
+				permanent_table = permanent_table .. "<td>" .. dst_ip .. "</td>\n"                                               
+	                else
+	                        permanent_table = permanent_table .. "<td></td>\n"          
+			end
+			local src_port = x:get("dreamcatcher",IcName,"src_port")                                                          
+	                if src_port ~= nil then
+				permanent_table = permanent_table .. "<td>" .. src_port .. "</td>\n"                                               
+	                else
+	                        permanent_table = permanent_table .. "<td></td>\n"          
+			end
+			local dst_port = x:get("dreamcatcher",IcName,"dst_port")                                                          
+	                if dst_port ~= nil then
+				permanent_table = permanent_table .. "<td>" .. dst_port .. "</td>\n"                                               
+	                else
+        	                permanent_table = permanent_table .. "<td></td>\n"          
+			end
+			local verdict = x:get("dreamcatcher",IcName,"verdict")                                                          
+	                if verdict ~= nil then
+				permanent_table = permanent_table .. "<td>" .. verdict .. "</td>\n"   
+			else
+	                        permanent_table = permanent_table .. "<td></td>\n"          
+			end
+			permanent_table = permanent_table 
+				.. '<td><form style="margin:0px;display: inline" id="' .. IcName .. "delete" .. '" action="" method="POST">'
+                                .. '<input type="hidden" name="delete" value="' .. IcName .. '"></input>'   
+                                .. '<input type="button" onclick="modify_rule(\'' .. IcName .. '\',\'delete\')" value="Delete"></input>'
+                                .. '</form></td>'
+			permanent_table = permanent_table .. "</tr>"
+		end
+	end
+	)
+	x:foreach("dreamcatcher","dpi_rule",function(s)
+		local IcName = s[".name"]
+		local approved = x:get("dreamcatcher",IcName,"approved")
+		if approved == "1" then
+			flag = true
+			permanent_table = permanent_table .. "<tr>"
+			local src_device = ""                                                                                                  
+                        local dst_device = ""                                                                                                  
+                        local device_name = ""                                                                                              
+                        local src_vlan = x:get("dreamcatcher",IcName,"src_vlan")                                                               
+                        if src_vlan == nil then                                                                                             
+                                src_device = "Unknown device"                                                                                  
+                        else                                                                                                                
+                                src_device = GetDeviceName(src_vlan)                                                                           
+                        end                                                                                                             
+                        local dst_vlan = x:get("dreamcatcher",IcName,"dst_vlan")                                                               
+                        if dst_vlan == nil then                                                                                                
+                                dst_device = "Unknown device"                                                                                  
+                        else                                                                                                                   
+                                dst_device = GetDeviceName(dst_vlan)                                                                           
+                        end                                                                                                                    
+                        local device_name = x:get("dreamcatcher",IcName,"device_name")                                                         
+                        if device_name == nil then                                                                                             
+                                device_name = "Unknown device"                                                                              
+                        end                                                                                                                    
+                        local type = x:get("dreamcatcher",IcName,"type")                                                                    
+                        local message = GetTitle(src_device,dst_device,device_name,type)
+			--local message = x:get("dreamcatcher",IcName,"message")
 			permanent_table = permanent_table .. "<td>" .. message .. "</td>\n"
 			local proto = x:get("dreamcatcher",IcName,"proto")
 			if proto ~= nil then
@@ -469,11 +659,32 @@ function advanced_temp_rule_table()
 	"</tr>"      
 	x:foreach("dreamcatcher","rule",function(s)                                               
 		local IcName = s[".name"]
-		local type = x:get("dreamcatcher",IcName,"approved")
-		if type == "0" then
+		local approved = x:get("dreamcatcher",IcName,"approved")
+		if approved == "0" then
 			flag = true
                 	temp_table = temp_table .. "<tr>\n"                                         
-                	local message = x:get("dreamcatcher",IcName,"message")
+                        local src_device = ""                                                                                                  
+                        local dst_device = ""                                                                                                  
+                        local device_name = ""                                                                                              
+                        local src_vlan = x:get("dreamcatcher",IcName,"src_vlan")                                                               
+                        if src_vlan == nil then                                                                                             
+                                src_device = "Unknown device"                                                                                  
+                        else                                                                                                                
+                                src_device = GetDeviceName(src_vlan)                                                                           
+                        end                                                                                                             
+                        local dst_vlan = x:get("dreamcatcher",IcName,"dst_vlan")                                                               
+                        if dst_vlan == nil then                                                                                                
+                                dst_device = "Unknown device"                                                                                  
+                        else                                                                                                                   
+                                dst_device = GetDeviceName(dst_vlan)                                                                           
+                        end                                                                                                                    
+                        local device_name = x:get("dreamcatcher",IcName,"device_name")                                                         
+                        if device_name == nil then                                                                                             
+                                device_name = "Unknown device"                                                                              
+                        end                                                                                                                    
+                        local type = x:get("dreamcatcher",IcName,"type")                                                                    
+                        local message = GetTitle(src_device,dst_device,device_name,type)
+			--local message = x:get("dreamcatcher",IcName,"message")
 			temp_table = temp_table .. "<td>" .. message .. "</td>\n"
                 	local proto = x:get("dreamcatcher",IcName,"proto")
                 	if proto ~= nil then                                                      
@@ -522,6 +733,82 @@ function advanced_temp_rule_table()
 		end                                                                          
 	end                                                                               
         )
+	x:foreach("dreamcatcher","dpi_rule",function(s)                                               
+		local IcName = s[".name"]
+		local approved = x:get("dreamcatcher",IcName,"approved")
+		if approved == "0" then
+			flag = true
+                	temp_table = temp_table .. "<tr>\n"                                         
+                        local src_device = ""                                                                                                  
+                        local dst_device = ""                                                                                                  
+                        local device_name = ""                                                                                              
+                        local src_vlan = x:get("dreamcatcher",IcName,"src_vlan")                                                               
+                        if src_vlan == nil then                                                                                             
+                                src_device = "Unknown device"                                                                                  
+                        else                                                                                                                
+                                src_device = GetDeviceName(src_vlan)                                                                           
+                        end                                                                                                             
+                        local dst_vlan = x:get("dreamcatcher",IcName,"dst_vlan")                                                               
+                        if dst_vlan == nil then                                                                                                
+                                dst_device = "Unknown device"                                                                                  
+                        else                                                                                                                   
+                                dst_device = GetDeviceName(dst_vlan)                                                                           
+                        end                                                                                                                    
+                        local device_name = x:get("dreamcatcher",IcName,"device_name")                                                         
+                        if device_name == nil then                                                                                             
+                                device_name = "Unknown device"                                                                              
+                        end                                                                                                                    
+                        local type = x:get("dreamcatcher",IcName,"type")                                                                    
+                        local message = GetTitle(src_device,dst_device,device_name,type)
+			--local message = x:get("dreamcatcher",IcName,"message")
+			temp_table = temp_table .. "<td>" .. message .. "</td>\n"
+                	local proto = x:get("dreamcatcher",IcName,"proto")
+                	if proto ~= nil then                                                      
+                        	temp_table = temp_table .. "<td>" .. proto .. "</td>\n"
+                	else                                                                      
+                        	temp_table = temp_table .. "<td></td>\n"                  
+                	end                                                                       
+                	local src_ip = x:get("dreamcatcher",IcName,"src_ip")                      
+                	if src_ip ~= nil then                                                     
+                        	temp_table = temp_table .. "<td>" .. src_ip .. "</td>\n"  
+                	else                                                                      
+                        	temp_table = temp_table .. "<td></td>\n"                  
+                	end                                                                     
+                	local dst_ip = x:get("dreamcatcher",IcName,"dst_ip")                      
+                	if dst_ip ~= nil then                                                     
+                        	temp_table = temp_table .. "<td>" .. dst_ip .. "</td>\n"  
+               		else                                                                      
+                        	temp_table = temp_table .. "<td></td>\n"                  
+                	end                                                                     
+                	local src_port = x:get("dreamcatcher",IcName,"src_port")               
+                	if src_port ~= nil then                                                   
+                        	temp_table = temp_table .. "<td>" .. src_port .. "</td>\n"
+                	else                                                                      
+                        	temp_table = temp_table .. "<td></td>\n"                  
+                	end                                                                       
+                	local dst_port = x:get("dreamcatcher",IcName,"dst_port")                
+                	if dst_port ~= nil then                                                   
+                        	temp_table = temp_table .. "<td>" .. dst_port .. "</td>\n"
+                	else                                                                      
+                        	temp_table = temp_table .. "<td></td>\n"                  
+                	end                                                                       
+			temp_table = temp_table .. "<td>" 
+				.. '<form style="margin:0px;display:inline" id="' .. IcName .. "accept" .. '" action="" method="POST">'                    
+                                .. '<input type="hidden" name="accept" value="' .. IcName .. '"></input>'                              
+                                .. '<input type="button" onclick="modify_rule(\'' .. IcName .. '\',\'accept\')" value="Accept"></input>'          
+                                .. '</form>'
+				.. '<form style="margin:0px;display:inline" id="' .. IcName .. "reject" .. '" action="" method="POST">'                    
+                                .. '<input type="hidden" name="reject" value="' .. IcName .. '"></input>'                              
+                                .. '<input type="button" onclick="modify_rule(\'' .. IcName .. '\',\'reject\')" value="Reject"></input>'          
+                                .. '</form>'
+				.. '<form style="margin:0px;display:inline" id="' .. IcName .. "delete" .. '" action="" method="POST">'
+				.. '<input type="hidden" name="delete" value="' .. IcName .. '"></input>' 
+				.. '<input type="button" onclick="modify_rule(\'' .. IcName .. '\',\'delete\')" value="Delete"></input>' 
+				.. '</form></td>'
+			temp_table = temp_table .. "</tr>" 
+		end                                                                          
+	end                                                                               
+    )
 	temp_table = temp_table .. "</table>" 
 	if flag == true then
 		return temp_table
@@ -541,11 +828,32 @@ function general_perm_rule_table()
         "</tr>"
 	x:foreach("dreamcatcher","rule",function(s)
 		local IcName = s[".name"]
-		local type = x:get("dreamcatcher",IcName,"approved")
-		if type == "1" then
+		local approved = x:get("dreamcatcher",IcName,"approved")
+		if approved == "1" then
 			flag = true
                         permanent_table = permanent_table .. "<tr>\n"
-			local message = x:get("dreamcatcher",IcName,"message")                                                                                                                              
+			local src_device = ""                                                                                                  
+                        local dst_device = ""                                                                                                  
+                        local device_name = ""                                                                                                 
+                        local src_vlan = x:get("dreamcatcher",IcName,"src_vlan")                                                               
+                        if src_vlan == nil then                                                                                                
+                                src_device = "Unknown device"                                                                                  
+                        else                                                                                                                   
+                                src_device = GetDeviceName(src_vlan)                                                                           
+                        end                                                                                                                    
+                        local dst_vlan = x:get("dreamcatcher",IcName,"dst_vlan")                                                            
+                        if dst_vlan == nil then                                                                                                
+                                dst_device = "Unknown device"                                                                           
+                        else                                                                                                                   
+                                dst_device = GetDeviceName(dst_vlan)                                                                           
+                        end                                                                                                                    
+                        local device_name = x:get("dreamcatcher",IcName,"device_name")                                                         
+                        if device_name == nil then                                                                                             
+                                device_name = "Unknown device"                                                                              
+                        end                                                                                                                    
+                        local type = x:get("dreamcatcher",IcName,"type")                                                                    
+                        local message = GetTitle(src_device,dst_device,device_name,type) 
+			--local message = x:get("dreamcatcher",IcName,"message")                                                                                                                              
                         permanent_table = permanent_table .. "<td>" .. message .. "</td>\n"
 			local verdict = x:get("dreamcatcher",IcName,"verdict")                                           
                         if verdict ~= nil then                                                                           
@@ -562,6 +870,50 @@ function general_perm_rule_table()
 		end
 	end
 	)
+	x:foreach("dreamcatcher","dpi_rule",function(s)                                                                                         
+                local IcName = s[".name"]                                                                                                      
+                local approved = x:get("dreamcatcher",IcName,"approved")                                                                        
+                if approved == "1" then                                                                                                            
+                        flag = true                                                                                                            
+                        permanent_table = permanent_table .. "<tr>\n"                                                                          
+                        local src_device = ""                                                                                                  
+                        local dst_device = ""                                                                                                  
+                        local device_name = ""                                                                                                 
+                        local src_vlan = x:get("dreamcatcher",IcName,"src_vlan")                                                        
+                        if src_vlan == nil then                                                                                                
+                                src_device = "Unknown device"                                                                           
+                        else                                                                                                                   
+                                src_device = GetDeviceName(src_vlan)                                                                           
+                        end                                                                                                                    
+                        local dst_vlan = x:get("dreamcatcher",IcName,"dst_vlan")                                                               
+                        if dst_vlan == nil then                                                                                                
+                                dst_device = "Unknown device"                                                                                  
+                        else                                                                                                                   
+                                dst_device = GetDeviceName(dst_vlan)                                                                           
+                        end                                                                                                                 
+                        local device_name = x:get("dreamcatcher",IcName,"device_name")                                                         
+                        if device_name == nil then                                                                                          
+                                device_name = "Unknown device"                                                                                 
+                        end                                                                                                                 
+                        local type = x:get("dreamcatcher",IcName,"type")                                                                       
+                        local message = GetTitle(src_device,dst_device,device_name,type)                                                
+                        --local message = x:get("dreamcatcher",IcName,"message")                                                               
+                        permanent_table = permanent_table .. "<td>" .. message .. "</td>\n"                                                    
+                        local verdict = x:get("dreamcatcher",IcName,"verdict")                                                                 
+                        if verdict ~= nil then                                                                                                 
+                                permanent_table = permanent_table .. "<td>" .. verdict .. "</td>\n"                                            
+                        else                                                                                                                   
+                                permanent_table = permanent_table .. "<td></td>\n"                                                             
+                        end                                                                                                                    
+                        permanent_table = permanent_table                                                                               
+                                .. '<td><form style="margin:0px;display: inline" id="' .. IcName .. "delete" .. '" action="" method="POST">'   
+                                .. '<input type="hidden" name="delete" value="' .. IcName .. '"></input>'                                   
+                                .. '<input type="button" onclick="modify_rule_2(\'' .. IcName .. '\',\'delete\')" value="Delete"></input>'       
+                                .. '</form></td>'                                                                                           
+                        permanent_table = permanent_table .. "</tr>"                                                                        
+                end                                                                                                                         
+        end                                                                                                                                 
+        )
 	permanent_table = permanent_table .. "</table>"
 	if flag == true then
 		return permanent_table
@@ -578,16 +930,34 @@ function general_temp_rule_table()
                 "<td>Message</td>" ..                                                                                                  
                 "<td width=\"150\"<td>" ..                                                                                             
         "</tr>"
-	local array_vlan1_0 = {}
-	local array_vlan2_0 = {}
-	local size_0 = 0  
 	x:foreach("dreamcatcher","rule",function(s)
 		local IcName = s[".name"]
-		local type = x:get("dreamcatcher",IcName,"approved")
-		if type == "0" then
+		local approved = x:get("dreamcatcher",IcName,"approved")
+		if approved == "0" then
 			flag = true
 			temp_table = temp_table .. "<tr>\n"
-                        local message = x:get("dreamcatcher",IcName,"message")                                                                                                                              
+			local src_device = ""
+			local dst_device = ""
+			local device_name = ""
+                        local src_vlan = x:get("dreamcatcher",IcName,"src_vlan")
+			if src_vlan == nil then
+				src_device = "Unknown device"
+			else
+				src_device = GetDeviceName(src_vlan)
+			end
+			local dst_vlan = x:get("dreamcatcher",IcName,"dst_vlan")
+			if dst_vlan == nil then
+				dst_device = "Unknown device"
+			else
+				dst_device = GetDeviceName(dst_vlan)
+			end
+			local device_name = x:get("dreamcatcher",IcName,"device_name")
+			if device_name == nil then
+				device_name = "Unknown device"
+			end
+			local type = x:get("dreamcatcher",IcName,"type")
+			local message = GetTitle(src_device,dst_device,device_name,type)
+			--local message = x:get("dreamcatcher",IcName,"message")                                                                                                                              
                         temp_table = temp_table .. "<td>" .. message .. "</td>\n" 			
 			temp_table = temp_table .. "<td>"                                                                              
                         	.. '<form style="margin:0px;display:inline" id="' .. IcName .. "accept" .. '" action="" method="POST">'
@@ -605,6 +975,51 @@ function general_temp_rule_table()
                         temp_table = temp_table .. "</tr>"
 		end
 	end)
+	x:foreach("dreamcatcher","dpi_rule",function(s)                                                         
+                local IcName = s[".name"]                                                                   
+                local approved = x:get("dreamcatcher",IcName,"approved")                                        
+                if approved == "0" then                                                                         
+                        flag = true                                                                         
+                        temp_table = temp_table .. "<tr>\n"                                                 
+                        local src_device = ""                                                               
+                        local dst_device = ""                                                               
+                        local device_name = ""                                                              
+                        local src_vlan = x:get("dreamcatcher",IcName,"src_vlan")                            
+                        if src_vlan == nil then                                                             
+                                src_device = "Unknown device"                                               
+                        else                                                                                
+                                src_device = GetDeviceName(src_vlan)                                        
+                        end                                                                                 
+                        local dst_vlan = x:get("dreamcatcher",IcName,"dst_vlan")                            
+                        if dst_vlan == nil then                                                             
+                                dst_device = "Unknown device"                                               
+                        else                                                                                
+                                dst_device = GetDeviceName(dst_vlan)                                        
+                        end                                                                                 
+                        local device_name = x:get("dreamcatcher",IcName,"device_name")                      
+                        if device_name == nil then                                                          
+                                device_name = "Unknown device"                                              
+                        end                                                                                 
+                        local type = x:get("dreamcatcher",IcName,"type")                                    
+                        local message = GetTitle(src_device,dst_device,device_name,type)                    
+                        --local message = x:get("dreamcatcher",IcName,"message")                            
+                        temp_table = temp_table .. "<td>" .. message .. "</td>\n"                           
+                        temp_table = temp_table .. "<td>"                                                                              
+                        	.. '<form style="margin:0px;display:inline" id="' .. IcName .. "accept" .. '" action="" method="POST">'
+                        	.. '<input type="hidden" name="accept" value="' .. IcName .. '"></input>'                              
+                        	.. '<input type="button" onclick="modify_rule_2(\'' .. IcName .. '\',\'accept\')" value="Accept"></input>'
+                        	.. '</form>'                                                                                           
+                        	.. '<form style="margin:0px;display:inline" id="' .. IcName .. "reject" .. '" action="" method="POST">'
+                        	.. '<input type="hidden" name="reject" value="' .. IcName .. '"></input>'                              
+                        	.. '<input type="button" onclick="modify_rule_2(\'' .. IcName .. '\',\'reject\')" value="Reject"></input>'
+                        	.. '</form>'                                                                                           
+                        	.. '<form style="margin:0px;display:inline" id="' .. IcName .. "delete" .. '" action="" method="POST">'
+                        	.. '<input type="hidden" name="delete" value="' .. IcName .. '"></input>'                              
+                        	.. '<input type="button" onclick="modify_rule_2(\'' .. IcName .. '\',\'delete\')" value="Delete"></input>'
+                        	.. '</form></td>'                                                                                      
+                        temp_table = temp_table .. "</tr>"                                                  
+                end                                                                                         
+        end)
 	temp_table = temp_table .. "</table>"
 	if flag == true then
 		return temp_table
@@ -632,12 +1047,11 @@ function add_rule()
 	local src_port = http.formvalue("src_port")
 	local dst_port = http.formvalue("dst_port")
 	local verdict = http.formvalue("verdict")
-	local type = http.formvalue("type")
 	local x = luci.model.uci.cursor()
 	local src_device = ""
 	local dst_device = ""
 	if rule_type == "perm" then
-		local string = "type" .. type .. "src_vlan" .. src_vlan .. "dst_vlan" .. dst_vlan .. "proto" .. proto .. "src_ip" .. src_ip
+		local string = "type" .. "0" .. "src_vlan" .. src_vlan .. "dst_vlan" .. dst_vlan .. "proto" .. proto .. "src_ip" .. src_ip
 				.. "dst_ip" .. dst_ip .. "src_port" .. src_port .. "dst_port" .. dst_port
 		--local name = GeneratePassword(16)
 		local name = getMD5(string)
@@ -652,7 +1066,7 @@ function add_rule()
                 else                                                                              
                         dst_device = "unknown device"                                             
                 end
-		x:set("dreamcatcher",name,"message",GetTitle(src_device,dst_device,type))
+		--x:set("dreamcatcher",name,"message",GetTitle(src_device,dst_device,type))
 		if src_vlan ~= "" then
 			x:set("dreamcatcher",name,"src_vlan",src_vlan)
                 end
@@ -677,14 +1091,10 @@ function add_rule()
 		if verdict ~= "" then
 			x:set("dreamcatcher",name,"verdict",verdict)                                                                         
 		end
-		if type ~= "" then
-			x:set("dreamcatcher",name,"type",type)
-		else
-			x:set("dreamcatcher",name,"type","0")
-		end
+		x:set("dreamcatcher",name,"type","0")
 		x:set("dreamcatcher",name,"approved","1")
 	else
-		local string = "type" .. type .. "src_vlan" .. src_vlan .. "dst_vlan" .. dst_vlan .. "proto" .. proto .. "src_ip" .. src_ip  
+		local string = "type" .. "0" .. "src_vlan" .. src_vlan .. "dst_vlan" .. dst_vlan .. "proto" .. proto .. "src_ip" .. src_ip  
                                 .. "dst_ip" .. dst_ip .. "src_port" .. src_port .. "dst_port" .. dst_port                                      
                 --local name = GeneratePassword(16)                                                                                            
                 local name = getMD5(string) 
@@ -697,9 +1107,9 @@ function add_rule()
                 if dst_vlan ~= nil then                                                                   
                         dst_device = GetDeviceName(dst_vlan)                                              
                 else                                                                                      
-                        dst_device = "unknown device"                                                     
+                        dst_device = "Unknown device"                                                     
                 end                                                                                       
-                x:set("dreamcatcher",name,"message",GetTitle(src_device,dst_device,type))
+                --x:set("dreamcatcher",name,"message",GetTitle(src_device,dst_device,type))
 		if src_vlan ~= "" then                                                                                                 
                         x:set("dreamcatcher",name,"src_vlan",src_vlan)                                                                 
                 end                                                                                                                    
@@ -724,11 +1134,7 @@ function add_rule()
                 if verdict ~= "" then                                                                                                  
                         x:set("dreamcatcher",name,"verdict",verdict)                                                                   
                 end
-		if type ~= "" then                                                                                           
-                        x:set("dreamcatcher",name,"type",type)                                         
-                else                                                                                                          
-                        x:set("dreamcatcher",name,"type","0")                                                                
-                end   
+		x:set("dreamcatcher",name,"type","0")
 		x:set("dreamcatcher",name,"approved","0")    	
 	end
 	x:commit("dreamcatcher")
@@ -925,15 +1331,15 @@ function GenerateTable()
 	return table_text
 end
 
-function GetTitle(src_device,dst_device,type)
+function GetTitle(src_device,dst_device,device_name,type)
 	if type == "0" then
-		return src_device .. " wants to communicate with " .. dst_device
+		return src_device .. " wants to send messages to " .. dst_device
 	elseif type == "1" then
-		return src_device .. " wants to discover devices on your network"
+		return src_device .. " wants to broadcast messages to your network"
 	elseif type == "2" then
-		return src_device .. " wants to tell other devices on your network about itself"
+		return src_device .. " is trying to discover services on your network"
 	elseif type == "3" then
-		return src_device .. " wants to broadcast to your network"
+		return src_device .. " wants to advertise itself on your network as " .. device_name
 	else 
 		return "Unknown Message"
 	end	
@@ -946,5 +1352,6 @@ function getMD5(string_input)
 	local md5 = string.sub(result,1,32)
 	return md5
 end
+
 
 
