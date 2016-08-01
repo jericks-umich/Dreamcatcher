@@ -248,7 +248,8 @@ int add_rule(struct nfq_data *tb, u_int32_t* verdict) {
 			//print_ipv6(ipv6); // side-effect, increments data to layer 4
 			break;
 		default:
-			LOGD("Unknown Layer 3 protocol: %hhu. Not handled.",ip->ip_v);
+			LOGI("Unknown Layer 3 protocol: %hhu. Not handled.",ip->ip_v);
+      return -1; // don't create new rule, still block this packet
 	}
 
   // Check if BROADCAST traffic
@@ -309,7 +310,7 @@ int add_rule(struct nfq_data *tb, u_int32_t* verdict) {
 			break;
 			//case SCTP : // not implemented (yet?)
 		default :
-			LOGD("Unknown protocol %hhu. Not handled.", proto);
+			LOGI("Unknown protocol %hhu. Not handled.", proto);
       return -1; // don't add a new rule, but still block this packet
 	}
 
