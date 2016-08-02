@@ -15,6 +15,7 @@ ip6tables -I OUTPUT -j REJECT
 ip6tables -P INPUT DROP
 ip6tables -P FORWARD DROP
 ip6tables -P OUTPUT DROP
+ip6tables -I FORWARD -m physdev --physdev-is-bridged -j REJECT
 
 
 # block connections between wired and wireless networks
