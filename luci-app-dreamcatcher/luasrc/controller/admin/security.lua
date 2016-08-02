@@ -1260,12 +1260,19 @@ function delete_devices()
 						local src_vlan = x:get("dreamcatcher",IcName,"src_vlan")
 						local dst_vlan = x:get("dreamcatcher",IcName,"dst_vlan")
 						if (src_vlan == vlan or dst_vlan == vlan) then
-							if(x:delete("dreamcatcher",IcName)) then
-								x:commit("dreamcatcher")
-								os.execute("/sbin/fw3 reload-dreamcatcher")
-							end
+							x:delete("dreamcatcher",IcName)
 						end
-					end) 
+					end)
+					x:foreach("dreamcatcher","dpi_rule",function(s)                                                                                                               
+                                                local IcName = s[".name"]                                                                   
+                                                local src_vlan = x:get("dreamcatcher",IcName,"src_vlan")                                                                                          
+                                                local dst_vlan = x:get("dreamcatcher",IcName,"dst_vlan")                                                                                                    
+                                                if (src_vlan == vlan or dst_vlan == vlan) then                                                                                                    
+                                                        x:delete("dreamcatcher",IcName)                                               
+                                                end                                                                                                       
+                                        end)
+					x:commit("dreamcatcher")                                                                                                                                                                            
+        				os.execute("/sbin/fw3 reload-dreamcatcher")	
 				end	
 				temp = temp + 1
 			end	
