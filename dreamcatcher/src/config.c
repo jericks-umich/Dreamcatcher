@@ -77,6 +77,7 @@ void hash_rule(rule* r) {
   MD5_CTX c;
   unsigned char hash_bytes[MD5_DIGEST_LENGTH];
   char hash_string[512] = "\0";
+  *r->hash = '\0'; // zero out existing hash
   // create string to be hashed
   // required
   snprintf(hash_string, sizeof(hash_string)-1, "%stype%d", hash_string, r->type);
@@ -303,8 +304,8 @@ unsigned int read_dns_name(unsigned char* payload, unsigned char* start, char* b
     // check if next segment is a reference
     if ((*ptr & 192) == 192) { // it's a pointer if first two bits are set 0b11000000
       // pointer is two bytes, network order
-      offset = *(ptr+1); // set to lower 8 bits
-      offset += ((*ptr & 191) << 8); // add upper 6 bits
+      offset = ntohs(*(u_int16_t*)ptr); // get offset (including flag bits)
+      offset &= 16383; // mask off flag bits (mask == 0b0011111111111111)
       if (num_bytes == 0) { // if num_bytes isn't set yet, aka this is the first pointer
         num_bytes = (ptr+2) - start; // how many bytes has ptr gone?
       }
@@ -334,11 +335,14 @@ unsigned int read_dns_name(unsigned char* payload, unsigned char* start, char* b
 unsigned char* skip_question(unsigned char* p) {
   unsigned char* ptr = p;
   while (*ptr != 0) {
-    ptr += ((*ptr) + 1); // ptr points at the number of characters in this segment of the name, so move it to the end of the segment
+    if ((*ptr & 192) == 192) { // it's a pointer if first two bits are set 0b11000000
+      return ptr+2; // skip the two-byte pointer and we're done
+    } else { // if it's not a pointer, read the next segment
+      ptr += ((*ptr) + 1); // ptr points at the number of characters in this segment of the name, so move it to the end of the segment
+    }
   }
-  // after the name is done, there are the QTYPE and QCLASS fields, each is 2 bytes
-  ptr += 4;
-  return ptr;
+  // after the name is done, there are the null byte ptr is pointing at, and QTYPE and QCLASS fields, each is 2 bytes
+  return ptr+5;
 }
 
 // parses a dns payload, reads all the answers, puts all the answers in result (which must be freed later)
@@ -346,7 +350,7 @@ unsigned char* skip_question(unsigned char* p) {
 // SRV records can have multiple device names (the "name" and the "target") so we need 2x buffers for them -- the extras will go unused
 // returns 0 on success, -1 on failure
 int parse_dns_answers(dns_header* dns, unsigned char* payload, char** result) {
-  unsigned char* p = payload;
+  unsigned char* p = payload + sizeof(*dns); // pointer to start of question/answer section
   char buf[DEVICE_NAME_SIZE];
   int name_length;
   int ptr_found = 0;
@@ -356,35 +360,51 @@ int parse_dns_answers(dns_header* dns, unsigned char* payload, char** result) {
   for (int i = 0; i < dns->questions; i++) {
     p = skip_question(p); // moves p forward past all the questions to the answers
   } // p now points at the answer section of the dns record
+  LOGV("Skipped over questions");
   // parse the answers and put them all in result (duplicates are fine for this rough draft, they just take up more time)
-  for (int i = 0; i < dns->answer_rr; i++) {
+  for (int i = 0, j = 0; i < dns->answer_rr; i++) {
     name_length = read_dns_name(payload, p, buf); // put name in buf
     p += name_length; // move p forward to type section
     type = ntohs(*(u_int16_t*)p); // translate from network byte order to host byte order
     p += 8; // move p past the TYPE (2 bytes), CLASS (2 bytes), and TTL (4 bytes) fields
     data_len = ntohs(*(u_int16_t*)p); // translate from network byte order to host byte order
+    p += 2; // move p past the RDLENGTH field
     // if type is A, AAAA, SRV, TXT, use response from read_dns_name as device name
     // if type is PTR, SRV, read the RDATA field for the device name (or 2nd device name in case of SRV)
+    // special case for PTR records, if name starts with _services._dns-sd.*, we check domain for _<proto>._<proto>.*, and if so, completely ignore this answer (allowing the packet, if otherwise the case)
     switch (type) {
       case A :
-        snprintf(result[2*i], DEVICE_NAME_SIZE, "%s", strtok(buf, ".")); // this will mess up on strings that actually have an escaped '.' char
+      case TXT :
+      case AAAA :
+        result[j] = calloc(sizeof(char), DEVICE_NAME_SIZE);
+        snprintf(result[j++], DEVICE_NAME_SIZE, "%s", strtok(buf, ".")); // this will mess up on strings that actually have an escaped '.' char
         break;
       case PTR :
+        if (strncmp(buf, "_services._dns-sd.", 18) == 0) { // if name matches services prefix, check for special case
+          read_dns_name(payload, p, buf); // first 6 bytes are priority, weight, port
+          // check that first two segments of domain start with underscores, as the spec (https://tools.ietf.org/html/rfc6763#section-9) says they should
+          if (strncmp(strtok(buf, "."), "_", 1) == 0 &&
+              strncmp(strtok(NULL, "."), "_", 1) == 0) { // they do!
+            break; // don't add this device name
+          } else { // weird, name matches services prefix, but domain doesn't conform
+            LOGI("Weird case. DNS name starts with _services._dns-sd., but domain doesn't start with underscores.");
+            result[j] = calloc(sizeof(char), DEVICE_NAME_SIZE);
+            snprintf(result[j++], DEVICE_NAME_SIZE, "%s", buf); // we already used strtok on buf, so it should already have a '\0' where the first '.' was and just return the first segment like we want
+            break;
+          }
+        }
         read_dns_name(payload, p, buf); // first 6 bytes are priority, weight, port
-        snprintf(result[2*i], DEVICE_NAME_SIZE, "%s", strtok(buf, ".")); // this will mess up on strings that actually have an escaped '.' char
-        break;
-      case TXT :
-        snprintf(result[2*i], DEVICE_NAME_SIZE, "%s", strtok(buf, ".")); // this will mess up on strings that actually have an escaped '.' char
-        break;
-      case AAAA :
-        snprintf(result[2*i], DEVICE_NAME_SIZE, "%s", strtok(buf, ".")); // this will mess up on strings that actually have an escaped '.' char
+        result[j] = calloc(sizeof(char), DEVICE_NAME_SIZE);
+        snprintf(result[j++], DEVICE_NAME_SIZE, "%s", strtok(buf, ".")); // this will mess up on strings that actually have an escaped '.' char
         break;
       case SRV :
         // set first device name as buf from above
-        snprintf(result[2*i], DEVICE_NAME_SIZE, "%s", strtok(buf, ".")); // this will mess up on strings that actually have an escaped '.' char
+        result[j] = calloc(sizeof(char), DEVICE_NAME_SIZE);
+        snprintf(result[j++], DEVICE_NAME_SIZE, "%s", strtok(buf, ".")); // this will mess up on strings that actually have an escaped '.' char
         // set second device name as target field
         read_dns_name(payload, p+6, buf); // first 6 bytes are priority, weight, port
-        snprintf(result[2*i+1], DEVICE_NAME_SIZE, "%s", strtok(buf, ".")); // this will mess up on strings that actually have an escaped '.' char
+        result[j] = calloc(sizeof(char), DEVICE_NAME_SIZE);
+        snprintf(result[j++], DEVICE_NAME_SIZE, "%s", strtok(buf, ".")); // this will mess up on strings that actually have an escaped '.' char
         break;
       default :
         LOGW("Unsupported DNS answer type: %u", type);
@@ -393,6 +413,14 @@ int parse_dns_answers(dns_header* dns, unsigned char* payload, char** result) {
     p += data_len; // move p past RDATA field, ready for next iteration
   }
   return 0;
+}
+
+// frees our dynamically created array of strings
+void free_names(char** names) {
+  for (int i = 0; names[i] != 0; i++) {
+    free(names[i]);
+  }
+  free(names);
 }
 
 
@@ -411,7 +439,9 @@ int check_dpi_rule(rule* r, dns_header* dns, unsigned char* payload, u_int32_t* 
   u_int32_t flag = 1; // gets set to 0 if packet should be blocked
   u_int32_t temp_verdict;
   char buf[DEVICE_NAME_SIZE];
-  char names[dns->answer_rr*2][DEVICE_NAME_SIZE];
+
+  // Allocate names struct
+  char** names = calloc(sizeof(char*), (dns->answer_rr*2)+1); // array of char*'s (individual char*'s will be allocated later). the +1 is so we are guaranteed to have a null pointer at the end
 
   struct uci_context* ctx;
   struct uci_package* pkg;
@@ -419,13 +449,15 @@ int check_dpi_rule(rule* r, dns_header* dns, unsigned char* payload, u_int32_t* 
 
   if (dns->qr == 1) { // only the ADVERTISE rules should have the device name included in the rule
     r->type = ADVERTISE;
+    LOGV("DNS Response packet, parsing answers");
     parse_ret = parse_dns_answers(dns, payload, (char**) names); // populates names with names for new rules, some names will be empty
     if (parse_ret == -1) {
+      free_names(names);
       return -1;
     }
   } else if (dns->qr == 0) { // if it's a discover packet
     r->type = DISCOVER;
-    read_dns_name(payload, payload, buf); // log the question name, just because I'm curious
+    read_dns_name(payload, payload + sizeof(*dns), buf); // log the question name, just because I'm curious
     LOGV("This dns packet refers to %s", buf);
   }
 
@@ -437,6 +469,7 @@ int check_dpi_rule(rule* r, dns_header* dns, unsigned char* payload, u_int32_t* 
   }
   if (fd == -1) {
     LOGE("Could not open or lock config file.");
+    free_names(names);
     return 1; // not sure what to do here, for now just say the rule exists (default block) and do nothing
   }
 
@@ -466,13 +499,12 @@ int check_dpi_rule(rule* r, dns_header* dns, unsigned char* payload, u_int32_t* 
         alert_user();
         ret = 1;
       } else {
-        LOGW("Could not write rule to the config file.");
+        LOGV("Did not write rule to the config file.");
       }
     }
   } else if (r->type == ADVERTISE) {
     // iterate over all the device names, check if their rules ALL exist AND say ACCEPT
-    for (int i = 0; i < dns->answer_rr*2; i++) {
-      if (strncmp(names[i], "\0", DEVICE_NAME_SIZE) == 0) { continue; } // skip empty names
+    for (int i = 0; names[i] != NULL; i++) { // iterate over our list of names
       strncpy(r->device_name, names[i], DEVICE_NAME_SIZE); // set device name to this name
       LOGV("Checking if rule exists for device name %s", r->device_name);
       // (re)calculate hash of rule
@@ -493,13 +525,13 @@ int check_dpi_rule(rule* r, dns_header* dns, unsigned char* payload, u_int32_t* 
           alert_user();
           ret = 1;
         } else {
-          LOGW("Could not write rule to the config file.");
+          LOGV("Did not write rule to the config file.");
         }
       }
-      if (flag == 1) { // if we never set flag to 0
-        LOGV("All devices existed in the dpi_rules and had ACCEPT rules, so we can ACCEPT this packet! Yay!");
-        *verdict = NF_ACCEPT; // then we can accept the packet! yay!
-      }
+    }
+    if (flag == 1) { // if we never set flag to 0
+      LOGV("All devices existed in the dpi_rules and had ACCEPT rules, so we can ACCEPT this packet! Yay!");
+      *verdict = NF_ACCEPT; // then we can accept the packet! yay!
     }
   }
 
@@ -511,9 +543,11 @@ int check_dpi_rule(rule* r, dns_header* dns, unsigned char* payload, u_int32_t* 
   }
   if (lock_ret == -1) {
     LOGE("Could not unlock or close config file.");
+    free_names(names);
     return 1; // not sure what to do here, for now just say the rule exists (default block) and do nothing
   }
 
+  free_names(names);
   return ret;
 }
 

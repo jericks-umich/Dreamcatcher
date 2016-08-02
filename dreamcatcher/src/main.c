@@ -287,7 +287,7 @@ int add_rule(struct nfq_data *tb, u_int32_t* verdict) {
       if ((new_rule.dst_port == 5353)) {
         new_rule.dst_vlan = 0; // remove dst_vlan since we allow link-local traffic to be multicast or unicast the same way
         dns = (dns_header*) data;
-        data = data + sizeof(*dns); // data now points at the start of questions variable-length field
+        //data = data + sizeof(*dns); // data now points at the start of questions variable-length field
         print_dns(dns);
         // check against existing dpi_rule set for ALLOW/BLOCK verdict
         return check_dpi_rule(&new_rule, dns, data, verdict);
