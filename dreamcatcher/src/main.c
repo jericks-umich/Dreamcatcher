@@ -443,16 +443,16 @@ void alert_user() {
   // get key_header
   fd = fopen("/etc/config/gcm_auth_key","r");
   if (fd == NULL) {
-    LOGE("missing /etc/config/gcm_auth_key");
-    exit(-1);
+    LOGW("Missing /etc/config/gcm_auth_key. Can't alert user of new rules.");
+    return;
   }
   fgets(key_header, sizeof(key_header), fd);
   fclose(fd);
   // get registration id
   fd = fopen("/etc/config/gcm_reg_id","r");
   if (fd == NULL) {
-    LOGE("missing /etc/config/gcm_reg_id");
-    exit(-1);
+    LOGW("Missing /etc/config/gcm_reg_id. Can't alert user of new rules.");
+    return;
   }
   fgets(target, sizeof(target), fd);
   fclose(fd);
