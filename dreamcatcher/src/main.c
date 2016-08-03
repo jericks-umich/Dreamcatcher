@@ -434,10 +434,29 @@ void print_icmp(struct icmphdr* i) {
 
 void alert_user() {
   int ret = 0;
+  FILE* fd;
 
   struct curl_slist* headers = NULL;
-  char* key_header = "Authorization: key=AIzaSyCkzLOzVdzLj_FLh2Y2X2k4cKfRt0L8TsQ";
-  char* target = "fpD5nXntW30:APA91bHLzpJlld0XlmLeXZ1qssw1cm0w6FK5rAytZDkI8Bcb06ysVMCD8Gw_nhpoHEAT2H7DMBIz6OCd7D7RhGIZ3zU3CnbTZf0E7zf2rxjqKQZ0ES8kOp8vzQqg1S1Un-HwPkJHwLQE";
+  char key_header[128]; // = "Authorization: key=AIzaSyCkzLOzVdzLj_FLh2Y2X2k4cKfRt0L8TsQ";
+  char target[256]; // = "fpD5nXntW30:APA91bHLzpJlld0XlmLeXZ1qssw1cm0w6FK5rAytZDkI8Bcb06ysVMCD8Gw_nhpoHEAT2H7DMBIz6OCd7D7RhGIZ3zU3CnbTZf0E7zf2rxjqKQZ0ES8kOp8vzQqg1S1Un-HwPkJHwLQE";
+
+  // get key_header
+  fd = fopen("/etc/config/gcm_auth_key","r");
+  if (fd == NULL) {
+    LOGE("missing /etc/config/gcm_auth_key");
+    exit(-1);
+  }
+  fgets(key_header, sizeof(key_header), fd);
+  fclose(fd);
+  // get registration id
+  fd = fopen("/etc/config/gcm_reg_id","r");
+  if (fd == NULL) {
+    LOGE("missing /etc/config/gcm_reg_id");
+    exit(-1);
+  }
+  fgets(target, sizeof(target), fd);
+  fclose(fd);
+
 
   headers = curl_slist_append(headers,"Accept: application/json");
   headers = curl_slist_append(headers,"Content-Type:application/json");
