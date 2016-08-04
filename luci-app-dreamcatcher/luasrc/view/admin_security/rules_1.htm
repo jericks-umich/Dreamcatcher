@@ -2,6 +2,11 @@
 
 <h1><a id="title1" name="title1"><%:Rules Page%></a></h1>
 <div> This page shows the rules for dreamcatcher.</div>
+<form id="accept_all" method="post" action="">
+  <input type="hidden" name="accept_all_rule" id="accept_all_rule" value="233"></input>
+  <input style="float:right" type="button" onclick="accept_all_rules()" value="Accepted all pending rules" />
+  <br>
+</form>
 <h2><a id="title2" name="title2"><%:Pending Rules%></a></h2>     
 <br>
 <pre>
@@ -71,5 +76,9 @@ function modify_rule(IcName,method){
 function modify_rule_2(IcName,method){
 	document.getElementById(IcName.concat(method)).submit();
 }
+
+function accept_all_rules(){                                     
+        document.getElementById("accept_all").submit();         
+} 
 </script>
 <%+footer%>

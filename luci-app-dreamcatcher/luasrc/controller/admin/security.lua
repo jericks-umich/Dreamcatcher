@@ -3,16 +3,19 @@ module("luci.controller.admin.security",package.seeall)
 local http = require("luci.http")
 local protocol = require("luci.http.protocol")
 local json = require("luci.json")
+local log = require("luci.log")
 
+log.print("-------------------------------------------------------")
+log.print("Log start!")
 
 function index()
 	entry({"admin","security"},template("admin_security/security"),("Security"),89).index = false
 	entry({"admin","security","process"},call("Device_page"),"Add/List Devices",4).dependent=false
 	entry({"admin","security","rule"}, firstchild(),"Rules",5).dependent=false
 	entry({"admin","security","rule","rules_1"},call("Rule_General"),"General",6).dependent=false
-	entry({"admin","security","rule","rules_2"},call("Rule_Advanced"),"Advanced",7).dependent=false
+	--entry({"admin","security","rule","rules_2"},call("Rule_Advanced"),"Advanced",7).dependent=false
 	entry({"admin","security","verdict_1"},call("Verdict_1"),"",9).dependent=false
-	entry({"admin","security","verdict_2"},call("Verdict_2"),"",10).depentdent=false
+	--entry({"admin","security","verdict_2"},call("Verdict_2"),"",10).depentdent=false
 end
 
 function Verdict_1()                                                                                              
@@ -153,10 +156,12 @@ end
 function Rule_General()                                 
         local http_method = http.getenv("REQUEST_METHOD")
         if http_method == "POST" then                  
-                local delete = http.formvalue("delete")
+                log.print("Got Post")
+		local delete = http.formvalue("delete")
                 local accept = http.formvalue("accept")
                 local reject = http.formvalue("reject")
-                local src_vlan = http.formvalue("src_vlan")
+                local accept_all_rule = http.formvalue("accept_all_rule")
+		local src_vlan = http.formvalue("src_vlan")
 		if delete~=nil then      
                         delete_rule()    
                 elseif accept ~= nil then
@@ -165,6 +170,8 @@ function Rule_General()
                         reject_rule_general()
                 elseif src_vlan ~= nil then              
                         add_rule()
+		elseif accept_all_rule ~= nil then
+			accept_all_rules()
                 end                                  
 		http.redirect(luci.dispatcher.build_url("admin","security","rule","rules_1"));
         end                                          
@@ -177,15 +184,19 @@ end
 function Rule_Advanced()
 	local http_method = http.getenv("REQUEST_METHOD")
 	if http_method == "POST" then
+		log.print("Got Post")
 		local delete = http.formvalue("delete")
 		local accept = http.formvalue("accept")
 		local reject = http.formvalue("reject")
+		local accept_all_rule = http.formvalue("accept_all_rule")
 		if delete~=nil then
 			delete_rule()
 		elseif accept ~= nil then
 			accept_rule_advanced()
 		elseif reject ~= nil then
 			reject_rule_advanced()
+		elseif accept_all_rule ~= nil then
+			accept_all_rules()
 		else
 			add_rule()
 		end
@@ -1236,6 +1247,7 @@ function delete_devices()
 	local file = io.open("/etc/freeradius2/users","r")
 	local wfile = ""
 	local temp = -1
+	log.print("Begin search device name")
 	for line in file:lines() do
 		if line:sub(1,1)=='"' then
 			local templine = string.sub(line,2)
@@ -1243,6 +1255,7 @@ function delete_devices()
 			local name = string.sub(line,2,e)
 			if dname==name then
 				temp = 0
+				log.print("Found device name")
 			end 
 		end
 		if(temp == -1 or temp == 7) then
@@ -1255,35 +1268,51 @@ function delete_devices()
 					s,e = string.find(subline,'"',1,true)
 					local vlan = string.sub(subline,1,s-1)
 					local x = luci.model.uci.cursor()
+					log.print("Found device's vlan")
+					log.print("Removing rule with same vlan")
 					x:foreach("dreamcatcher","rule",function(s)
 						local IcName = s[".name"]
 						local src_vlan = x:get("dreamcatcher",IcName,"src_vlan")
 						local dst_vlan = x:get("dreamcatcher",IcName,"dst_vlan")
 						if (src_vlan == vlan or dst_vlan == vlan) then
+							log.print("Deleting rule " .. IcName)
 							x:delete("dreamcatcher",IcName)
 						end
 					end)
+					log.print("Removed rule with same vlan")
+					log.print("Removing dpi_rule with same vlan")
 					x:foreach("dreamcatcher","dpi_rule",function(s)                                                                                                               
                                                 local IcName = s[".name"]                                                                   
                                                 local src_vlan = x:get("dreamcatcher",IcName,"src_vlan")                                                                                          
                                                 local dst_vlan = x:get("dreamcatcher",IcName,"dst_vlan")                                                                                                    
                                                 if (src_vlan == vlan or dst_vlan == vlan) then                                                                                                    
-                                                        x:delete("dreamcatcher",IcName)                                               
+                                                        log.print("Deleting dpi rule" .. IcName)
+							x:delete("dreamcatcher",IcName)                                               
                                                 end                                                                                                       
                                         end)
-					x:commit("dreamcatcher")                                                                                                                                                                            
-        				os.execute("/sbin/fw3 reload-dreamcatcher")	
+					log.print("Removed dpi_rule with same vlan")
+					log.print("Begin commit to the dreamcatcher config file")
+					x:commit("dreamcatcher") 
+					log.print("Commited dreamcatcher config file")
+					log.print("Restarting dreamcatcher config file")                                                                                                                                                                           
+        				os.execute("/sbin/fw3 reload-dreamcatcher")
+					log.print("Restarted dreamcatcher config file")	
 				end	
 				temp = temp + 1
 			end	
 		end	
 	end
 	file:close()
+	log.print("Open freeradius2 config file")
 	local writefile = io.open("/etc/freeradius2/users","w")
+	log.print("Begin writing to the config file")
 	writefile:write(wfile)
+	log.print("Finished writing to the config file")
 	writefile:close()
+	log.print("Restarting freeradius2")
 	os.execute("killall radiusd") -- restart and reload not implemented 
 	os.execute("/etc/init.d/radiusd start")
+	log.print("Finished restarting freeradius2")
 	luci.template.render("admin_security/password",{
 		TODO = "",
 		table_text = GenerateTable()
@@ -1360,5 +1389,29 @@ function getMD5(string_input)
 	return md5
 end
 
+function accept_all_rules()
+	log.print("Start accepting all rules")
+	local x = luci.model.uci.cursor()
+	x:foreach("dreamcatcher","rule",function(s)                                                                                                                             
+                local IcName = s[".name"]                                                                                                                                                         
+		local approved = x:get("dreamcatcher",IcName,"approved")
+		if approved == '0' then
+			x:set("dreamcatcher",IcName,"approved","1")
+			x:set("dreamcatcher",IcName,"verdict","ACCEPT")
+		end
+	end)
+	x:foreach("dreamcatcher","dpi_rule",function(s)                                                                                                                                                         
+                local IcName = s[".name"]                                                                                                    
+                local approved = x:get("dreamcatcher",IcName,"approved")                                                                                                                                    
+                if approved == '0' then                                                                                                                                             
+                        x:set("dreamcatcher",IcName,"approved","1")                                                                                       
+                        x:set("dreamcatcher",IcName,"verdict","ACCEPT")                                                                     
+                end                                                                                                                                       
+        end)
+	x:commit("dreamcatcher")                                                                                                                                                                  
+        os.execute("/sbin/fw3 reload-dreamcatcher")
+	log.print("End accepting all rules")
+end
 
-
+log.print("Log end!")
+log.print("-------------------------------------------------------")
