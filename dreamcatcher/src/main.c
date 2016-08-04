@@ -284,7 +284,7 @@ int add_rule(struct nfq_data *tb, u_int32_t* verdict) {
       //new_rule.dst_port = (unsigned int) udp->uh_dport;
       
       // Check if mDNS/link-local traffic
-      if ((new_rule.dst_port == 5353)) {
+      if ((udp->uh_dport == 5353)) {
         new_rule.proto = UDP;
         new_rule.dst_vlan = 0; // remove dst_vlan since we allow link-local traffic to be multicast or unicast the same way
         dns = (dns_header*) data;
