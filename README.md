@@ -38,6 +38,10 @@ configuration at config/wireless that should be copied to /etc/config/wireless
 on the router. This creates a test network named "TEST NETWORK DO NOT USE"
 that connects to the radius server configured in /etc/freeradius2/.
 
+You will need to put the Google Cloud Messaging Auth token and registration
+id into /etc/config/gcm\_auth\_key and /etc/config/gcm\_reg\_id, respectively, for
+push notifications to work.
+
 In a future commit, we will want to automate this configuration and generate
 new certificates, etc. during the install.
 
