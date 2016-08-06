@@ -2,11 +2,11 @@
 
 <h1><a id="title1" name="title1"><%:Rules Page%></a></h1>
 <div> This page shows the rules for dreamcatcher.</div>
-<form id="accept_all" method="post" action="">
+<!--<form id="accept_all" method="post" action="">
   <input type="hidden" name="accept_all_rule" id="accept_all_rule" value="233"></input>
   <input style="float:right" type="button" onclick="accept_all_rules()" value="Accepted all pending rules" />
   <br>
-</form>
+</form>-->
 <h2><a id="title2" name="title2"><%:Pending Rules%></a></h2>     
 <br>
 <pre>
@@ -63,14 +63,14 @@ function add_temp_rule(){
 }
 
 function modify_rule(IcName,method){
-	if (method == 'accept' || method == 'reject'){
-		r = confirm("Warning:\nAllowing/Blocking connections will Allow/Block ALL such connections. This may have security implications or may mean your devices will not work properly. Are you sure you want to do this? \n\nIf you would like more information and to selectively allow connections from, please use the Advanced tab.");
-		if (r == true){
+//	if (method == 'accept' || method == 'reject'){
+//		r = confirm("Warning:\nAllowing/Blocking connections will Allow/Block ALL such connections. This may have security implications or may mean your devices will not work properly. Are you sure you want to do this? \n\nIf you would like more information and to selectively allow connections from, please use the Advanced tab.");
+//		if (r == true){
 			document.getElementById(IcName.concat(method)).submit();
-		}
-	}else{
-		document.getElementById(IcName.concat(method)).submit();
-	}
+//		}
+//	}else{
+//		document.getElementById(IcName.concat(method)).submit();
+//	}
 }
 
 function modify_rule_2(IcName,method){

@@ -234,6 +234,7 @@ end
 function accept_rule_general()
 	local accept_rule = http.formvalue("accept")
 	local x = luci.model.uci.cursor()
+	local name = accept_rule
 	if (x:get("dreamcatcher",accept_rule,"approved")=="0") then
 		local src_vlan = x:get("dreamcatcher",accept_rule,"src_vlan")	
 		local dst_vlan = x:get("dreamcatcher",accept_rule,"dst_vlan")
@@ -251,10 +252,10 @@ function accept_rule_general()
 		if (dst_ip == nil) then
 			dst_ip = ""
 		end
-		local string_1 = "type" .. type .. "src_vlan" .. src_vlan .. "dst_vlan" .. dst_vlan .. "proto"  .. "src_ip" 
-                                .. "dst_ip" .. "src_port" .. "dst_port"  		
-		local string_2 = "type" .. type .. "src_vlan" .. src_vlan .. "dst_vlan" .. "proto"  .. "src_ip"                                                                                 
-                                .. "dst_ip" .. dst_ip .. "src_port" .. "dst_port"
+		--local string_1 = "type" .. type .. "src_vlan" .. src_vlan .. "dst_vlan" .. dst_vlan .. "proto"  .. "src_ip" 
+                --                .. "dst_ip" .. "src_port" .. "dst_port"  		
+		--local string_2 = "type" .. type .. "src_vlan" .. src_vlan .. "dst_vlan" .. "proto"  .. "src_ip"                                                                                 
+                --                .. "dst_ip" .. dst_ip .. "src_port" .. "dst_port"
 		if type == "0" then
 			local flag = false
 			x:foreach("dreamcatcher","rule",function(s)                                                                                            
@@ -269,7 +270,7 @@ function accept_rule_general()
 				end
 			end)
 			if (flag == true) then
-				local name = getMD5(string_1)                                                                                    
+				--local name = getMD5(string_1)                                                                                    
                                 x:set("dreamcatcher",name,"rule")                                                                              
                                 if (src_vlan ~= "") then                                                                                       
                                         x:set("dreamcatcher",name,"src_vlan",src_vlan)                                                         
@@ -285,7 +286,7 @@ function accept_rule_general()
                                 x:commit("dreamcatcher")                                                                                    
                                 os.execute("/sbin/fw3 reload-dreamcatcher")
 			elseif (x:delete("dreamcatcher",accept_rule)) then
-				local name = getMD5(string_1)                                                                                            
+				--local name = getMD5(string_1)                                                                                            
                 		x:set("dreamcatcher",name,"rule")   			
 				if (src_vlan ~= "") then
 					x:set("dreamcatcher",name,"src_vlan",src_vlan)
@@ -315,7 +316,7 @@ function accept_rule_general()
 				end
 			end)
 			if (flag == true) then
-				local name = getMD5(string_2)
+				--local name = getMD5(string_2)
 				x:set("dreamcatcher",name,"rule")
 				if (src_vlan ~= "") then
 					x:set("dreamcatcher",name,"src_vlan",src_vlan)
@@ -331,7 +332,7 @@ function accept_rule_general()
 				x:commit("dreamcatcher")                                                                                                                                                    
                                 os.execute("/sbin/fw3 reload-dreamcatcher")
 			elseif (x:delete("dreamcatcher",accept_rule)) then                                                                                                                                  
-                                local name = getMD5(string_2)                                                                                                                                               
+                                --local name = getMD5(string_2)                                                                                                                                        
                                 x:set("dreamcatcher",name,"rule")                                                                                                                                           
                                 if (src_vlan ~= "") then                                                                                                                                                    
                                         x:set("dreamcatcher",name,"src_vlan",src_vlan)                                                                                                                      
@@ -361,6 +362,7 @@ end
 function reject_rule_general()
 	local reject_rule = http.formvalue("reject")
 	local x = luci.model.uci.cursor()
+	local name = reject_rule
 	if (x:get("dreamcatcher",reject_rule,"approved")=="0") then
 		local src_vlan = x:get("dreamcatcher",reject_rule,"src_vlan")	
 		local dst_vlan = x:get("dreamcatcher",reject_rule,"dst_vlan")
@@ -378,10 +380,10 @@ function reject_rule_general()
 		if (dst_ip == nil) then
 			dst_ip = ""
 		end
-		local string_1 = "type" .. type .. "src_vlan" .. src_vlan .. "dst_vlan" .. dst_vlan .. "proto"  .. "src_ip" 
-                                .. "dst_ip" .. "src_port" .. "dst_port"  		
-		local string_2 = "type" .. type .. "src_vlan" .. src_vlan .. "dst_vlan" .. "proto"  .. "src_ip"                                                                                 
-                                .. "dst_ip" .. dst_ip .. "src_port" .. "dst_port"
+		--local string_1 = "type" .. type .. "src_vlan" .. src_vlan .. "dst_vlan" .. dst_vlan .. "proto"  .. "src_ip" 
+                --                .. "dst_ip" .. "src_port" .. "dst_port"  		
+		--local string_2 = "type" .. type .. "src_vlan" .. src_vlan .. "dst_vlan" .. "proto"  .. "src_ip"                                                                                 
+                --                .. "dst_ip" .. dst_ip .. "src_port" .. "dst_port"
 		if type == "0" then
 			local flag = false
 			x:foreach("dreamcatcher","rule",function(s)                                                                                            
@@ -396,7 +398,7 @@ function reject_rule_general()
 				end
 			end)
 			if (flag == true) then
-				local name = getMD5(string_1)                                                                                    
+				--local name = getMD5(string_1)                                                                                    
                                 x:set("dreamcatcher",name,"rule")                                                                              
                                 if (src_vlan ~= "") then                                                                                       
                                         x:set("dreamcatcher",name,"src_vlan",src_vlan)                                                         
@@ -412,7 +414,7 @@ function reject_rule_general()
                                 x:commit("dreamcatcher")                                                                                    
                                 os.execute("/sbin/fw3 reload-dreamcatcher")
 			elseif (x:delete("dreamcatcher",reject_rule)) then
-				local name = getMD5(string_1)                                                                                            
+				--local name = getMD5(string_1)                                                                                            
                 		x:set("dreamcatcher",name,"rule")   			
 				if (src_vlan ~= "") then
 					x:set("dreamcatcher",name,"src_vlan",src_vlan)
@@ -442,7 +444,7 @@ function reject_rule_general()
 				end
 			end)
 			if (flag == true) then
-				local name = getMD5(string_2)
+				--local name = getMD5(string_2)
 				x:set("dreamcatcher",name,"rule")
 				if (src_vlan ~= "") then
 					x:set("dreamcatcher",name,"src_vlan",src_vlan)
@@ -458,7 +460,7 @@ function reject_rule_general()
 				x:commit("dreamcatcher")                                                                                                                                                    
                                 os.execute("/sbin/fw3 reload-dreamcatcher")
 			elseif (x:delete("dreamcatcher",reject_rule)) then                                                                                                                                  
-                                local name = getMD5(string_2)                                                                                                                                               
+                                --local name = getMD5(string_2)                                                                                                                                               
                                 x:set("dreamcatcher",name,"rule")                                                                                                                                           
                                 if (src_vlan ~= "") then                                                                                                                                                    
                                         x:set("dreamcatcher",name,"src_vlan",src_vlan)                                                                                                                      
@@ -1369,7 +1371,7 @@ end
 
 function GetTitle(src_device,dst_device,device_name,type)
 	if type == "0" then
-		return src_device .. " wants to send messages to " .. dst_device
+		return src_device .. " wants to initiate connections to " .. dst_device
 	elseif type == "1" then
 		return src_device .. " wants to broadcast messages to your network"
 	elseif type == "2" then
