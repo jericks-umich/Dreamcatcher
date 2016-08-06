@@ -130,7 +130,7 @@
 +    fw3_foreach(src_int_prefix, &d_info->interface_prefix) {
 +      // ASSUMPTION: we will never have a dreamcatcher rule with no src_vlan
 +      // if no dst_vlan, then we have 1 rule per src_interface
-+      if (&rule->dst_vlan == 0) {
++      if (rule->dst_vlan == 0) {
 +        r = fw3_ipt_rule_create(handle, &rule->proto, NULL, NULL, &rule->ip_src, &rule->ip_dst);
 +        fw3_ipt_rule_sport_dport(r, &rule->port_src, &rule->port_dst);
 +        fw3_ipt_rule_svlan(r, src_int_prefix->name, rule->src_vlan);

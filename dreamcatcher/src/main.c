@@ -269,22 +269,23 @@ int add_rule(struct nfq_data *tb, u_int32_t* verdict) {
 	switch (proto) {
 		case TCP :
 			tcp = (struct tcphdr*) data;
-      new_rule.proto = TCP;
+      //new_rule.proto = TCP;
       //new_rule.src_port = (unsigned int) tcp->th_sport;
-      new_rule.dst_port = (unsigned int) tcp->th_dport;
+      //new_rule.dst_port = (unsigned int) tcp->th_dport;
 			break;
 		case UDP :
 			udp = (struct udphdr*) data;
       data = data + sizeof(*udp); // UDP header is always 8 bytes
-      new_rule.proto = UDP;
+      //new_rule.proto = UDP;
       //if (ip->ip_v == 4) {
       //  strncpy(new_rule.src_ip, inet_ntoa(ip->ip_src), sizeof(new_rule.src_ip));
       //}
       //new_rule.src_port = (unsigned int) udp->uh_sport;
-      new_rule.dst_port = (unsigned int) udp->uh_dport;
+      //new_rule.dst_port = (unsigned int) udp->uh_dport;
       
       // Check if mDNS/link-local traffic
-      if ((new_rule.dst_port == 5353)) {
+      if ((udp->uh_dport == 5353)) {
+        new_rule.proto = UDP;
         new_rule.dst_vlan = 0; // remove dst_vlan since we allow link-local traffic to be multicast or unicast the same way
         dns = (dns_header*) data;
         //data = data + sizeof(*dns); // data now points at the start of questions variable-length field
@@ -298,7 +299,7 @@ int add_rule(struct nfq_data *tb, u_int32_t* verdict) {
 			break;
 		case ICMP : 
 			icmp = (struct icmphdr*) data;
-      new_rule.proto = ICMP;
+      //new_rule.proto = ICMP;
 			break;
 			//case SCTP : // not implemented (yet?)
 		default :

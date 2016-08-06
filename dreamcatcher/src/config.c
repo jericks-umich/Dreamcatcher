@@ -199,7 +199,9 @@ int write_rule(rule* r) {
   if (r->dst_vlan != 0) { // optional
     rule_uci_set_int(ctx, r->hash, "dst_vlan", r->dst_vlan);
   }
-  rule_uci_set_str(ctx, r->hash, "proto", get_protocol_string(r->proto)); // required
+  if (r->proto != 0) { // optional
+    rule_uci_set_str(ctx, r->hash, "proto", get_protocol_string(r->proto));
+  }
   if (strncmp(r->src_ip, "\0", IP_ADDR_LEN) != 0) { // optional
     rule_uci_set_str(ctx, r->hash, "src_ip", r->src_ip);
   }
