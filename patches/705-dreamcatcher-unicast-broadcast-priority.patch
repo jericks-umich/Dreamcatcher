@@ -1,0 +1,105 @@
+--- a/dreamcatcher.c
++++ b/dreamcatcher.c
+@@ -2,7 +2,7 @@
+ 
+ const struct fw3_option fw3_dreamcatcher_rule_opts[] = {
+   //FW3_OPT("name",                string,    rule,     name),
+-  FW3_OPT("title",               int,       dreamcatcher_rule,     title),
++  FW3_OPT("type",                int,       dreamcatcher_rule,     type),
+   FW3_OPT("src_vlan",            vlan,      dreamcatcher_rule,     src_vlan),
+   FW3_OPT("dst_vlan",            vlan,      dreamcatcher_rule,     dst_vlan),
+   FW3_OPT("proto",               protocol,  dreamcatcher_rule,     proto),
+@@ -134,7 +134,16 @@ static void dreamcatcher_print_rule(stru
+             warn("   * Dreamcatcher unsupported rule target %d", rule->target);
+             return;
+         }
+-        fw3_ipt_rule_append(r, "DREAMCATCHER_lan_rule");
++        switch (rule->type) { // 0 == UNICAST, 1 == BROADCAST, other == error
++          case 0:
++            fw3_ipt_rule_append(r, "DC_UNICAST_lan_rule");
++            break;
++          case 1:
++            fw3_ipt_rule_append(r, "DC_BROADCAST_lan_rule");
++            break;
++          default:
++            warn("   * Dreamcatcher unsupported rule type %d", rule->type);
++        }
+       } else
+       // if there is a dst_vlan, then we have N rules per src_interface, N = number of interfaces
+       {
+@@ -156,7 +165,16 @@ static void dreamcatcher_print_rule(stru
+               warn("   * Dreamcatcher unsupported rule target %d", rule->target);
+               return;
+           }
+-          fw3_ipt_rule_append(r, "DREAMCATCHER_lan_rule");
++          switch (rule->type) { // 0 == UNICAST, 1 == BROADCAST, other == error
++            case 0:
++              fw3_ipt_rule_append(r, "DC_UNICAST_lan_rule");
++              break;
++            case 1:
++              fw3_ipt_rule_append(r, "DC_BROADCAST_lan_rule");
++              break;
++            default:
++              warn("   * Dreamcatcher unsupported rule type %d", rule->type);
++          }
+         }
+       }
+     }
+@@ -173,8 +191,10 @@ void fw3_print_dreamcatcher_rules(struct
+ }
+ 
+ void fw3_flush_dreamcatcher(struct fw3_ipt_handle *handle) {
+-  char chain[32] = "DREAMCATCHER_lan_rule";
+-  fw3_ipt_flush_chain(handle, chain);
++  char chain1[32] = "DREAMCATCHER_UNICAST_rule";
++  char chain2[32] = "DREAMCATCHER_BROADCAST_rule";
++  fw3_ipt_flush_chain(handle, chain1);
++  fw3_ipt_flush_chain(handle, chain2);
+ }
+ 
+ 
+--- a/zones.c
++++ b/zones.c
+@@ -48,7 +48,8 @@ static const struct fw3_chain_spec zone_
+ 	C(V4,  NAT,    CUSTOM_CHAINS, "prerouting_%s_rule"),
+ 	C(V4,  NAT,    CUSTOM_CHAINS, "postrouting_%s_rule"),
+ 
+-	C(ANY, FILTER, DREAMCATCHER,  "DREAMCATCHER_%s_rule"),
++	C(ANY, FILTER, DREAMCATCHER,  "DC_UNICAST_%s_rule"),
++	C(ANY, FILTER, DREAMCATCHER,  "DC_BROADCAST_%s_rule"),
+ 
+ 	{ }
+ };
+@@ -514,12 +515,17 @@ print_zone_rule(struct fw3_ipt_handle *h
+       fw3_ipt_rule_target(r, "NFQUEUE");
+       fw3_ipt_rule_addarg(r, NULL, "--queue-num", "4670"); // TODO: make the queue number configurable
+       fw3_ipt_rule_append(r, "zone_%s_forward", zone->name);
+-      // Second rule sends packets to DREAMCATCHER_lan_rule chain
++      // Second rule sends packets to DREAMCATCHER_UNICAST_lan_rule chain
+ 			r = fw3_ipt_rule_new(handle);
+-			fw3_ipt_rule_comment(r, "DREAMCATCHER chain");
+-			fw3_ipt_rule_target(r, "DREAMCATCHER_%s_rule", zone->name);
++			fw3_ipt_rule_comment(r, "DREAMCATCHER UNICAST chain");
++			fw3_ipt_rule_target(r, "DC_UNICAST_%s_rule", zone->name);
+ 			fw3_ipt_rule_append(r, "zone_%s_forward", zone->name);
+-      // Third rule sends packets to NFQUEUE if they didn't match any existing rules
++      // Third rule sends packets to DREAMCATCHER_BROADCAST_lan_rule chain
++			r = fw3_ipt_rule_new(handle);
++			fw3_ipt_rule_comment(r, "DREAMCATCHER BROADCAST chain");
++			fw3_ipt_rule_target(r, "DC_BROADCAST_%s_rule", zone->name);
++			fw3_ipt_rule_append(r, "zone_%s_forward", zone->name);
++      // Fourth rule sends packets to NFQUEUE if they didn't match any existing rules
+       r = fw3_ipt_rule_new(handle);
+       fw3_ipt_rule_comment(r,"Default DREAMCATCHER -> NFQUEUE");
+       fw3_ipt_rule_target(r, "NFQUEUE");
+--- a/options.h
++++ b/options.h
+@@ -377,7 +377,7 @@ struct fw3_dreamcatcher_rule
+ 
+ 	enum fw3_family family; // always set to ipv4
+ 
+-	int title;
++	int type;
+ 	int src_vlan;
+ 	int dst_vlan;
+ 	struct fw3_protocol proto;
