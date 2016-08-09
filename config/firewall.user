@@ -25,3 +25,4 @@ iptables -A forwarding_rule -m physdev --physdev-in eth0.2 --physdev-out wlan0.+
 # default rules
 # dhcp goes only to router
 iptables -A forwarding_rule -p udp --dport 67 -j REJECT
+iptables -A forwarding_rule -p udp --dport 68 -j REJECT
