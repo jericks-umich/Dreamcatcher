@@ -51,8 +51,8 @@
  void fw3_flush_dreamcatcher(struct fw3_ipt_handle *handle) {
 -  char chain[32] = "DREAMCATCHER_lan_rule";
 -  fw3_ipt_flush_chain(handle, chain);
-+  char chain1[32] = "DREAMCATCHER_UNICAST_rule";
-+  char chain2[32] = "DREAMCATCHER_BROADCAST_rule";
++  char chain1[32] = "DC_UNICAST_lan_rule";
++  char chain2[32] = "DC_BROADCAST_lan_rule";
 +  fw3_ipt_flush_chain(handle, chain1);
 +  fw3_ipt_flush_chain(handle, chain2);
  }
@@ -70,7 +70,15 @@
  
  	{ }
  };
-@@ -514,12 +515,17 @@ print_zone_rule(struct fw3_ipt_handle *h
+@@ -507,19 +508,24 @@ print_zone_rule(struct fw3_ipt_handle *h
+       struct fw3_protocol udp;
+       struct fw3_port mdns;
+       fw3_parse_protocol(&udp, "udp", false); // create udp protocol object
+-      fw3_parse_port(&udp, "5353", false); // create port 5353 object
++      fw3_parse_port(&mdns, "5353", false); // create port 5353 object
+       fw3_ipt_rule_proto(r, &udp);
+       fw3_ipt_rule_sport_dport(r, NULL, &mdns);
+       fw3_ipt_rule_comment(r,"mDNS -> NFQUEUE");
        fw3_ipt_rule_target(r, "NFQUEUE");
        fw3_ipt_rule_addarg(r, NULL, "--queue-num", "4670"); // TODO: make the queue number configurable
        fw3_ipt_rule_append(r, "zone_%s_forward", zone->name);
