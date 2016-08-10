@@ -1321,15 +1321,25 @@ function delete_devices()
 	})
 end
 
-function GeneratePassword(length)
-	math.randomseed(os.time())
-	if length < 1 then return nil end
-	local s = ""
-	for i = 1, length do
-		n = math.random(97,122)
-		s = s .. string.char(n)
-	end
-	return s
+function GeneratePassword(length)                                               
+        --math.randomseed(os.time())                                            
+        if length < 1 then return nil end                                       
+        local urandom = io.open("/dev/urandom","rb")                            
+        local s = ""                                                            
+        for i = 1, length do                                                    
+                s = s .. GenerateChar()                                         
+        end                                                                     
+        return s                                                                
+end                                                                             
+                                                                                
+function GenerateChar()                                                         
+        local urandom = io.open("/dev/urandom","rb")                            
+        local temp = urandom:read(4)                                            
+        local Large_int = 0                                                     
+        for i = 1, 4 do                                                         
+                Large_int = temp:byte(i) + 256 * Large_int                      
+        end                                                                     
+        return string.char(97 + Large_int % 26)                                 
 end
 
 function valid_username(dname)
