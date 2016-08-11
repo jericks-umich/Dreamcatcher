@@ -177,8 +177,10 @@ function Rule_General()
         end                                          
 	        luci.template.render("admin_security/rules_1",{
                 permanent = general_perm_rule_table(),
-                temp = general_temp_rule_table()
-        })
+                temp = general_temp_rule_table(),
+        	links = GenerateLinks(),
+		nodes = GenerateNodes()
+	})
 end        
 
 function Rule_Advanced()
@@ -234,7 +236,6 @@ end
 function accept_rule_general()
 	local accept_rule = http.formvalue("accept")
 	local x = luci.model.uci.cursor()
-	local name = accept_rule
 	if (x:get("dreamcatcher",accept_rule,"approved")=="0") then
 		local src_vlan = x:get("dreamcatcher",accept_rule,"src_vlan")	
 		local dst_vlan = x:get("dreamcatcher",accept_rule,"dst_vlan")
@@ -252,10 +253,10 @@ function accept_rule_general()
 		if (dst_ip == nil) then
 			dst_ip = ""
 		end
-		--local string_1 = "type" .. type .. "src_vlan" .. src_vlan .. "dst_vlan" .. dst_vlan .. "proto"  .. "src_ip" 
-                --                .. "dst_ip" .. "src_port" .. "dst_port"  		
-		--local string_2 = "type" .. type .. "src_vlan" .. src_vlan .. "dst_vlan" .. "proto"  .. "src_ip"                                                                                 
-                --                .. "dst_ip" .. dst_ip .. "src_port" .. "dst_port"
+		local string_1 = "type" .. type .. "src_vlan" .. src_vlan .. "dst_vlan" .. dst_vlan .. "proto"  .. "src_ip" 
+                                .. "dst_ip" .. "src_port" .. "dst_port"  		
+		local string_2 = "type" .. type .. "src_vlan" .. src_vlan .. "dst_vlan" .. "proto"  .. "src_ip"                                                                                 
+                                .. "dst_ip" .. dst_ip .. "src_port" .. "dst_port"
 		if type == "0" then
 			local flag = false
 			x:foreach("dreamcatcher","rule",function(s)                                                                                            
@@ -270,7 +271,7 @@ function accept_rule_general()
 				end
 			end)
 			if (flag == true) then
-				--local name = getMD5(string_1)                                                                                    
+				local name = getMD5(string_1)                                                                                    
                                 x:set("dreamcatcher",name,"rule")                                                                              
                                 if (src_vlan ~= "") then                                                                                       
                                         x:set("dreamcatcher",name,"src_vlan",src_vlan)                                                         
@@ -286,7 +287,7 @@ function accept_rule_general()
                                 x:commit("dreamcatcher")                                                                                    
                                 os.execute("/sbin/fw3 reload-dreamcatcher")
 			elseif (x:delete("dreamcatcher",accept_rule)) then
-				--local name = getMD5(string_1)                                                                                            
+				local name = getMD5(string_1)                                                                                            
                 		x:set("dreamcatcher",name,"rule")   			
 				if (src_vlan ~= "") then
 					x:set("dreamcatcher",name,"src_vlan",src_vlan)
@@ -316,7 +317,7 @@ function accept_rule_general()
 				end
 			end)
 			if (flag == true) then
-				--local name = getMD5(string_2)
+				local name = getMD5(string_2)
 				x:set("dreamcatcher",name,"rule")
 				if (src_vlan ~= "") then
 					x:set("dreamcatcher",name,"src_vlan",src_vlan)
@@ -332,7 +333,7 @@ function accept_rule_general()
 				x:commit("dreamcatcher")                                                                                                                                                    
                                 os.execute("/sbin/fw3 reload-dreamcatcher")
 			elseif (x:delete("dreamcatcher",accept_rule)) then                                                                                                                                  
-                                --local name = getMD5(string_2)                                                                                                                                        
+                                local name = getMD5(string_2)                                                                                                                                               
                                 x:set("dreamcatcher",name,"rule")                                                                                                                                           
                                 if (src_vlan ~= "") then                                                                                                                                                    
                                         x:set("dreamcatcher",name,"src_vlan",src_vlan)                                                                                                                      
@@ -362,7 +363,6 @@ end
 function reject_rule_general()
 	local reject_rule = http.formvalue("reject")
 	local x = luci.model.uci.cursor()
-	local name = reject_rule
 	if (x:get("dreamcatcher",reject_rule,"approved")=="0") then
 		local src_vlan = x:get("dreamcatcher",reject_rule,"src_vlan")	
 		local dst_vlan = x:get("dreamcatcher",reject_rule,"dst_vlan")
@@ -380,10 +380,10 @@ function reject_rule_general()
 		if (dst_ip == nil) then
 			dst_ip = ""
 		end
-		--local string_1 = "type" .. type .. "src_vlan" .. src_vlan .. "dst_vlan" .. dst_vlan .. "proto"  .. "src_ip" 
-                --                .. "dst_ip" .. "src_port" .. "dst_port"  		
-		--local string_2 = "type" .. type .. "src_vlan" .. src_vlan .. "dst_vlan" .. "proto"  .. "src_ip"                                                                                 
-                --                .. "dst_ip" .. dst_ip .. "src_port" .. "dst_port"
+		local string_1 = "type" .. type .. "src_vlan" .. src_vlan .. "dst_vlan" .. dst_vlan .. "proto"  .. "src_ip" 
+                                .. "dst_ip" .. "src_port" .. "dst_port"  		
+		local string_2 = "type" .. type .. "src_vlan" .. src_vlan .. "dst_vlan" .. "proto"  .. "src_ip"                                                                                 
+                                .. "dst_ip" .. dst_ip .. "src_port" .. "dst_port"
 		if type == "0" then
 			local flag = false
 			x:foreach("dreamcatcher","rule",function(s)                                                                                            
@@ -398,7 +398,7 @@ function reject_rule_general()
 				end
 			end)
 			if (flag == true) then
-				--local name = getMD5(string_1)                                                                                    
+				local name = getMD5(string_1)                                                                                    
                                 x:set("dreamcatcher",name,"rule")                                                                              
                                 if (src_vlan ~= "") then                                                                                       
                                         x:set("dreamcatcher",name,"src_vlan",src_vlan)                                                         
@@ -414,7 +414,7 @@ function reject_rule_general()
                                 x:commit("dreamcatcher")                                                                                    
                                 os.execute("/sbin/fw3 reload-dreamcatcher")
 			elseif (x:delete("dreamcatcher",reject_rule)) then
-				--local name = getMD5(string_1)                                                                                            
+				local name = getMD5(string_1)                                                                                            
                 		x:set("dreamcatcher",name,"rule")   			
 				if (src_vlan ~= "") then
 					x:set("dreamcatcher",name,"src_vlan",src_vlan)
@@ -444,7 +444,7 @@ function reject_rule_general()
 				end
 			end)
 			if (flag == true) then
-				--local name = getMD5(string_2)
+				local name = getMD5(string_2)
 				x:set("dreamcatcher",name,"rule")
 				if (src_vlan ~= "") then
 					x:set("dreamcatcher",name,"src_vlan",src_vlan)
@@ -460,7 +460,7 @@ function reject_rule_general()
 				x:commit("dreamcatcher")                                                                                                                                                    
                                 os.execute("/sbin/fw3 reload-dreamcatcher")
 			elseif (x:delete("dreamcatcher",reject_rule)) then                                                                                                                                  
-                                --local name = getMD5(string_2)                                                                                                                                               
+                                local name = getMD5(string_2)                                                                                                                                               
                                 x:set("dreamcatcher",name,"rule")                                                                                                                                           
                                 if (src_vlan ~= "") then                                                                                                                                                    
                                         x:set("dreamcatcher",name,"src_vlan",src_vlan)                                                                                                                      
@@ -1321,25 +1321,25 @@ function delete_devices()
 	})
 end
 
-function GeneratePassword(length)                                               
-        --math.randomseed(os.time())                                            
-        if length < 1 then return nil end                                       
-        local urandom = io.open("/dev/urandom","rb")                            
-        local s = ""                                                            
-        for i = 1, length do                                                    
-                s = s .. GenerateChar()                                         
-        end                                                                     
-        return s                                                                
-end                                                                             
-                                                                                
-function GenerateChar()                                                         
-        local urandom = io.open("/dev/urandom","rb")                            
-        local temp = urandom:read(4)                                            
-        local Large_int = 0                                                     
-        for i = 1, 4 do                                                         
-                Large_int = temp:byte(i) + 256 * Large_int                      
-        end                                                                     
-        return string.char(97 + Large_int % 26)                                 
+function GeneratePassword(length)
+	--math.randomseed(os.time())
+	if length < 1 then return nil end
+	local urandom = io.open("/dev/urandom","rb")
+	local s = ""
+	for i = 1, length do
+		s = s .. GenerateChar()
+	end
+	return s
+end
+
+function GenerateChar()
+	local urandom = io.open("/dev/urandom","rb")
+	local temp = urandom:read(4)
+	local Large_int = 0
+	for i = 1, 4 do
+		Large_int = temp:byte(i) + 256 * Large_int 
+	end
+	return string.char(97 + Large_int % 26) 
 end
 
 function valid_username(dname)
@@ -1381,7 +1381,7 @@ end
 
 function GetTitle(src_device,dst_device,device_name,type)
 	if type == "0" then
-		return src_device .. " wants to initiate connections to " .. dst_device
+		return src_device .. " wants to send messages to " .. dst_device
 	elseif type == "1" then
 		return src_device .. " wants to broadcast messages to your network"
 	elseif type == "2" then
@@ -1423,6 +1423,43 @@ function accept_all_rules()
 	x:commit("dreamcatcher")                                                                                                                                                                  
         os.execute("/sbin/fw3 reload-dreamcatcher")
 	log.print("End accepting all rules")
+end
+
+function GenerateLinks()                                                                                                                                                                                    
+        local links = ""                                                                                                                                                                                    
+        local x = luci.model.uci.cursor()                                                                                                                                                                   
+        x:foreach("dreamcatcher","rule",function(s)                                                                                                                                                         
+                local IcName = s[".name"]                                                                                                                                                                   
+                local type = x:get("dreamcatcher",IcName,"type")                                                                                                                                            
+                if type == "0" then                                                                                                                                                                         
+                        local src_vlan = x:get("dreamcatcher",IcName,"src_vlan")                                                                                                                            
+                        local dst_vlan = x:get("dreamcatcher",IcName,"dst_vlan")                                                                                                                            
+                        local src_device = GetDeviceName(src_vlan)                                                                                                                                          
+                        local dst_device = GetDeviceName(dst_vlan)                                                                                                                                          
+                        local approved = x:get("dreamcatcher",IcName,"approved")                                                                                                                            
+                        local verdict = x:get("dreamcatcher",IcName,"verdict")                                                                                                                              
+                        if (approved == "1" and verdict == "ACCEPT") then
+				links = links .. "{source: \"" .. src_device .. "\", target: \"" .. dst_device .. "\", type: \"unicast_accept\"},\n"
+			end                                                                                                                                                                                    
+                end 
+	end                                                                                                                                                                                        
+        )                                                                                                                                                                                                   
+	return links
+end 
+
+function GenerateNodes()
+	local nodes = ""
+	local file = io.open("/etc/freeradius2/users","r")                                                                                                                                                  
+	for line in file:lines() do                                                                                                                                                                         
+                if line:sub(1,1)=='"' then                                                                                                                                                                  
+                        local templine =string.sub(line,2)                                                                                                                                                  
+                        local e = string.find(templine,'"',1,true)                                                                                                                                          
+                        dname = string.sub(line,2,e) 
+			nodes = nodes .. 'dname = "' .. dname .. '"\n' 
+				.. 'dname = nodes[dname] || (nodes[dname] = {name : dname});\n'                                                                                                                                                      
+                end                                                                                                                                                                                         
+        end	
+	return nodes
 end
 
 log.print("Log end!")
