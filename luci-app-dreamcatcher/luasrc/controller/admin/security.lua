@@ -5,8 +5,8 @@ local protocol = require("luci.http.protocol")
 local json = require("luci.json")
 local log = require("luci.log")
 
-log.print("-------------------------------------------------------")
-log.print("Log start!")
+--log.print("-------------------------------------------------------")
+--log.print("Log start!")
 
 function index()
 	entry({"admin","security"},template("admin_security/security"),("Security"),89).index = false
@@ -156,7 +156,7 @@ end
 function Rule_General()                                 
         local http_method = http.getenv("REQUEST_METHOD")
         if http_method == "POST" then                  
-                log.print("Got Post")
+                --log.print("Got Post")
 		local delete = http.formvalue("delete")
                 local accept = http.formvalue("accept")
                 local reject = http.formvalue("reject")
@@ -186,7 +186,7 @@ end
 function Rule_Advanced()
 	local http_method = http.getenv("REQUEST_METHOD")
 	if http_method == "POST" then
-		log.print("Got Post")
+		--log.print("Got Post")
 		local delete = http.formvalue("delete")
 		local accept = http.formvalue("accept")
 		local reject = http.formvalue("reject")
@@ -1249,7 +1249,7 @@ function delete_devices()
 	local file = io.open("/etc/freeradius2/users","r")
 	local wfile = ""
 	local temp = -1
-	log.print("Begin search device name")
+	--log.print("Begin search device name")
 	for line in file:lines() do
 		if line:sub(1,1)=='"' then
 			local templine = string.sub(line,2)
@@ -1257,7 +1257,7 @@ function delete_devices()
 			local name = string.sub(line,2,e)
 			if dname==name then
 				temp = 0
-				log.print("Found device name")
+				--log.print("Found device name")
 			end 
 		end
 		if(temp == -1 or temp == 7) then
@@ -1270,51 +1270,51 @@ function delete_devices()
 					s,e = string.find(subline,'"',1,true)
 					local vlan = string.sub(subline,1,s-1)
 					local x = luci.model.uci.cursor()
-					log.print("Found device's vlan")
-					log.print("Removing rule with same vlan")
+					--log.print("Found device's vlan")
+					--log.print("Removing rule with same vlan")
 					x:foreach("dreamcatcher","rule",function(s)
 						local IcName = s[".name"]
 						local src_vlan = x:get("dreamcatcher",IcName,"src_vlan")
 						local dst_vlan = x:get("dreamcatcher",IcName,"dst_vlan")
 						if (src_vlan == vlan or dst_vlan == vlan) then
-							log.print("Deleting rule " .. IcName)
+							--log.print("Deleting rule " .. IcName)
 							x:delete("dreamcatcher",IcName)
 						end
 					end)
-					log.print("Removed rule with same vlan")
-					log.print("Removing dpi_rule with same vlan")
+					--log.print("Removed rule with same vlan")
+					--log.print("Removing dpi_rule with same vlan")
 					x:foreach("dreamcatcher","dpi_rule",function(s)                                                                                                               
                                                 local IcName = s[".name"]                                                                   
                                                 local src_vlan = x:get("dreamcatcher",IcName,"src_vlan")                                                                                          
                                                 local dst_vlan = x:get("dreamcatcher",IcName,"dst_vlan")                                                                                                    
                                                 if (src_vlan == vlan or dst_vlan == vlan) then                                                                                                    
-                                                        log.print("Deleting dpi rule" .. IcName)
+                                                        --log.print("Deleting dpi rule" .. IcName)
 							x:delete("dreamcatcher",IcName)                                               
                                                 end                                                                                                       
                                         end)
-					log.print("Removed dpi_rule with same vlan")
-					log.print("Begin commit to the dreamcatcher config file")
+					--log.print("Removed dpi_rule with same vlan")
+					--log.print("Begin commit to the dreamcatcher config file")
 					x:commit("dreamcatcher") 
-					log.print("Commited dreamcatcher config file")
-					log.print("Restarting dreamcatcher config file")                                                                                                                                                                           
+					--log.print("Commited dreamcatcher config file")
+					--log.print("Restarting dreamcatcher config file")                                                                                                                                                                           
         				os.execute("/sbin/fw3 reload-dreamcatcher")
-					log.print("Restarted dreamcatcher config file")	
+					--log.print("Restarted dreamcatcher config file")	
 				end	
 				temp = temp + 1
 			end	
 		end	
 	end
 	file:close()
-	log.print("Open freeradius2 config file")
+	--log.print("Open freeradius2 config file")
 	local writefile = io.open("/etc/freeradius2/users","w")
-	log.print("Begin writing to the config file")
+	--log.print("Begin writing to the config file")
 	writefile:write(wfile)
-	log.print("Finished writing to the config file")
+	--log.print("Finished writing to the config file")
 	writefile:close()
-	log.print("Restarting freeradius2")
+	--log.print("Restarting freeradius2")
 	os.execute("killall radiusd") -- restart and reload not implemented 
 	os.execute("/etc/init.d/radiusd start")
-	log.print("Finished restarting freeradius2")
+	--log.print("Finished restarting freeradius2")
 	luci.template.render("admin_security/password",{
 		TODO = "",
 		table_text = GenerateTable()
@@ -1402,7 +1402,7 @@ function getMD5(string_input)
 end
 
 function accept_all_rules()
-	log.print("Start accepting all rules")
+	--log.print("Start accepting all rules")
 	local x = luci.model.uci.cursor()
 	x:foreach("dreamcatcher","rule",function(s)                                                                                                                             
                 local IcName = s[".name"]                                                                                                                                                         
@@ -1422,7 +1422,7 @@ function accept_all_rules()
         end)
 	x:commit("dreamcatcher")                                                                                                                                                                  
         os.execute("/sbin/fw3 reload-dreamcatcher")
-	log.print("End accepting all rules")
+	--log.print("End accepting all rules")
 end
 
 function GenerateLinks()                                                                                                                                                                                    
@@ -1462,5 +1462,5 @@ function GenerateNodes()
 	return nodes
 end
 
-log.print("Log end!")
-log.print("-------------------------------------------------------")
+--log.print("Log end!")
+--log.print("-------------------------------------------------------")
