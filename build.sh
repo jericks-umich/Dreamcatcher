@@ -1,9 +1,10 @@
 #!/bin/bash
 
-USAGE="Usage: $0 [-h] [-s] [-i]
+USAGE="Usage: $0 [-h] [-s] [-i] [-vm] [-j]
 -h  print usage statement
 -s  skip intro updates (useful when rebuilding)
 -i  install required dependencies (apt-get based only)
+-vm	build x86 VM for testing
 "
 
 THIS_DIR="$( cd "$( /usr/bin/dirname "${BASH_SOURCE[0]}" )" && /bin/pwd )"
@@ -13,6 +14,7 @@ PATCH_DIR=$THIS_DIR/patches
 DREAMCATCHER_DIR=$THIS_DIR/dreamcatcher
 LUCI_APP_DREAMCATCHER_DIR=$THIS_DIR/luci-app-dreamcatcher
 DEPS="git-core build-essential libssl-dev libncurses5-dev unzip gawk subversion quilt"
+XTABLES_DEPS="pkg-config libxtables-dev libxtables11 xtables-addons-common xtables-addons-dkms xtables-addons-source"
 
 for arg in "$@"; do
 	case $arg in
@@ -21,6 +23,9 @@ for arg in "$@"; do
 			;;
 		-i)
 			INSTALL=1
+			;;
+		-vm)
+			VM=1
 			;;
 		*)
 			printf '%s' "$USAGE"
@@ -32,7 +37,7 @@ done
 # do installation of dependencies, but only if -i IS present
 if [ "$INSTALL" == "1" ] ; then
 	echo "Installing dependencies. Need your sudo password."
-	sudo apt-get install $DEPS
+	sudo apt-get install $DEPS $XTABLES_DEPS
 fi
 
 
@@ -69,7 +74,11 @@ echo "Updating OpenWRT build config file..."
 rm $OPENWRT_DIR/.config 2>/dev/null
 pushd $OPENWRT_DIR
 make defconfig
-cat $CONFIG_DIR/development.diff >> $OPENWRT_DIR/.config
+if [ "$VM" != "1" ] ; then
+	cat $CONFIG_DIR/development.diff >> $OPENWRT_DIR/.config
+else
+	cat $CONFIG_DIR/x86_vm.diff >> $OPENWRT_DIR/.config
+fi
 #cat $CONFIG_DIR/dreamcatcher.diff >> $OPENWRT_DIR/.config
 make defconfig
 popd
