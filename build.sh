@@ -99,6 +99,12 @@ ln -s $PATCH_DIR/702-dreamcatcher-firewall-reload.patch $OPENWRT_DIR/package/net
 # firewall3 - automatically create NFQUEUE target default rule to send packets to dreamcatcher
 rm $OPENWRT_DIR/package/network/config/firewall/patches/703-dreamcatcher-nfqueue-rule.patch 2>/dev/null
 ln -s $PATCH_DIR/703-dreamcatcher-nfqueue-rule.patch $OPENWRT_DIR/package/network/config/firewall/patches/703-dreamcatcher-nfqueue-rule.patch
+# firewall3 - adjust default dreamcatcher iptables rules to send mdns packets to dreamcatcher before hitting rules
+rm $OPENWRT_DIR/package/network/config/firewall/patches/704-dreamcatcher-mdns-rule.patch 2>/dev/null
+ln -s $PATCH_DIR/704-dreamcatcher-mdns-rule.patch $OPENWRT_DIR/package/network/config/firewall/patches/704-dreamcatcher-mdns-rule.patch
+# firewall3 - update to prioritize unicast rules over broadcast rules
+rm $OPENWRT_DIR/package/network/config/firewall/patches/705-dreamcatcher-unicast-broadcast-priority.patch 2>/dev/null
+ln -s $PATCH_DIR/705-dreamcatcher-unicast-broadcast-priority.patch $OPENWRT_DIR/package/network/config/firewall/patches/705-dreamcatcher-unicast-broadcast-priority.patch
 
 
 #### MAKE ####
