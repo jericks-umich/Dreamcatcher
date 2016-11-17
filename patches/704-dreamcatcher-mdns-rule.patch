@@ -1,13 +1,18 @@
 --- a/zones.c
 +++ b/zones.c
-@@ -502,12 +502,19 @@ print_zone_rule(struct fw3_ipt_handle *h
+@@ -502,12 +502,24 @@ print_zone_rule(struct fw3_ipt_handle *h
  		// these should go here specifically, after all the other firewall forwarding rules but before the default rule
  		if (has(zone->flags, handle->family, FW3_FLAG_DREAMCATCHER))
  		{
 -      // First rule sends packets to DREAMCATCHER_lan_rule chain
 +      // First rule sends mDNS packets straight to NFQUEUE, skipping the DREAMCATCHER_lan_rule chain
 +      r = fw3_ipt_rule_new(handle);
-+			fw3_ipt_rule_extra(r, "-p UDP --dport 5353");
++      struct fw3_protocol udp;
++      struct fw3_port mdns;
++      fw3_parse_protocol(&udp, "udp", false); // create udp protocol object
++      fw3_parse_port(&udp, "5353", false); // create port 5353 object
++      fw3_ipt_rule_proto(r, &udp);
++      fw3_ipt_rule_sport_dport(r, NULL, &mdns);
 +      fw3_ipt_rule_comment(r,"mDNS -> NFQUEUE");
 +      fw3_ipt_rule_target(r, "NFQUEUE");
 +      fw3_ipt_rule_addarg(r, NULL, "--queue-num", "4670"); // TODO: make the queue number configurable
