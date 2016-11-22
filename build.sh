@@ -108,6 +108,8 @@ ln -s $PATCH_DIR/705-dreamcatcher-unicast-broadcast-priority.patch $OPENWRT_DIR/
 # xtables-addons - add support for native iptables mdns module
 rm $OPENWRT_DIR/package/network/utils/xtables-addons/patches/706-dreamcatcher-xtables-mdns.patch 2>/dev/null
 ln -s $PATCH_DIR/706-dreamcatcher-xtables-mdns.patch $OPENWRT_DIR/package/network/utils/xtables-addons/patches/706-dreamcatcher-xtables-mdns.patch
+rm $OPENWRT_DIR/target/linux/generic/patches-4.1/706-dreamcatcher-xtables-mdns-kernel.patch 2>/dev/null
+ln -s $PATCH_DIR/706-dreamcatcher-xtables-mdns-kernel.patch $OPENWRT_DIR/target/linux/generic/patches-4.1/706-dreamcatcher-xtables-mdns.patch
 
 
 #### MAKE ####
