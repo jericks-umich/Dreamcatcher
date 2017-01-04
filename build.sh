@@ -112,6 +112,16 @@ rm $OPENWRT_DIR/target/linux/generic/patches-4.1/706-dreamcatcher-xtables-mdns-k
 ln -s $PATCH_DIR/706-dreamcatcher-xtables-mdns-kernel.patch $OPENWRT_DIR/target/linux/generic/patches-4.1/706-dreamcatcher-xtables-mdns.patch
 
 
+
+
+
+# fixes for switch to LEDE project
+#rm $OPENWRT_DIR/package/network/config/firewall/patches/707-dreamcatcher-lede-fix-freeradius.patch 2>/dev/null
+#ln -s $PATCH_DIR/707-dreamcatcher-lede-fixes.patch $OPENWRT_DIR/package/network/config/firewall/patches/707-dreamcatcher-lede-fixes.patch
+#rm $OPENWRT_DIR/package/feeds/packages/freeradius2/patches/707-dreamcatcher-lede-fix-freeradius.patch 2>/dev/null
+#ln -s $PATCH_DIR/707-dreamcatcher-lede-fix-freeradius.patch $OPENWRT_DIR/package/feeds/packages/freeradius2/patches/707-dreamcatcher-lede-fix-freeradius.patch
+
+
 #### MAKE ####
 # make openwrt
 echo "Building openwrt. This may take a while."

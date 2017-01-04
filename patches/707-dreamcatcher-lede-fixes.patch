@@ -1,0 +1,11 @@
+--- a/zones.c
++++ b/zones.c
+@@ -220,7 +220,7 @@ fw3_load_zones(struct fw3_state *state,
+ 
+ 		if (zone->dreamcatcher)
+ 		{
+-			setbit(zone->flags[0], FW3_FLAG_DREAMCATCHER); // ipv4
++			fw3_setbit(zone->flags[0], FW3_FLAG_DREAMCATCHER); // ipv4
+ 			//setbit(zone->flags[1], FW3_FLAG_DREAMCATCHER); // ipv6
+ 		}
+ 
