@@ -13,7 +13,7 @@ CONFIG_DIR=$THIS_DIR/config
 PATCH_DIR=$THIS_DIR/patches
 DREAMCATCHER_DIR=$THIS_DIR/dreamcatcher
 LUCI_APP_DREAMCATCHER_DIR=$THIS_DIR/luci-app-dreamcatcher
-DEPS="git-core build-essential libssl-dev libncurses5-dev unzip gawk subversion quilt"
+DEPS="git-core build-essential libssl-dev libncurses5-dev unzip gawk subversion quilt zlib1g-dev"
 XTABLES_DEPS="pkg-config libxtables-dev libxtables12 xtables-addons-common xtables-addons-dkms xtables-addons-source"
 
 for arg in "$@"; do
