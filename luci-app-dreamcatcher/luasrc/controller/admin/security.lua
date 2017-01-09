@@ -14,9 +14,39 @@ function index()
 	entry({"admin","security","rule"}, firstchild(),"Rules",5).dependent=false
 	entry({"admin","security","rule","rules_1"},call("Rule_General"),"General",6).dependent=false
 	--entry({"admin","security","rule","rules_2"},call("Rule_Advanced"),"Advanced",7).dependent=false
-	entry({"admin","security","verdict_1"},call("Verdict_1"),"",9).dependent=false
+	--entry({"admin","security","verdict_1"},call("Verdict_1"),"",9).dependent=false
 	--entry({"admin","security","verdict_2"},call("Verdict_2"),"",10).depentdent=false
+	entry({"admin","security","unauth_device"},call("unauth_device"),"",7).sysauth=false
+	entry({"admin","security","unauth_rule"},call("unauth_rule"),"",8).sysauth=false
 end
+
+function unauth_rule()
+	local http_method = http.getenv("REQUEST_METHOD")
+	if http_method == "POST" then
+		local delete = http.formvalue("delete")
+		local accept = http.formvalue("accept")
+		local reject = http.formvalue("reject")
+		if delete ~= nil then
+			delete_rule()
+		elseif accept ~= nil then
+			accept_rule_general()
+		elseif reject ~= nil then
+			reject_rule_general()
+		end
+		http.redirect(luci.dispatcher.build_url("admin","security","unauth_rule"))
+	end
+	------------------------------------------------------------------------
+	-----------------------------hardcoded----------------------------------
+	vlan = '101'
+	------------------------------------------------------------------------
+	------------------------------------------------------------------------
+	luci.template.render("admin_security/unauth_rule",{
+		permanent = unauth_perm_rule_table(vlan),
+		temp = unauth_temp_rule_table(vlan),
+		links = GenerateLinks(),
+		nodes = GenerateNodes()
+	})
+end   
 
 function Verdict_1()                                                                                              
         local http_method = http.getenv("REQUEST_METHOD")                                                         
@@ -136,9 +166,15 @@ function Device_page()
 		local dname = http.formvalue("device_name")
 		local delete = http.formvalue("delete_device")
 		if dname~=nil then
-			add_devices()
+			message = add_devices()
+			luci.template.render("admin_security/password",{                                                                                                                                          
+        		TODO = message,                                                                                                                                                                   
+            	table_text = GenerateTable()                                                                                                                                                      
+        	})
 		elseif delete ~= nil then
 			delete_devices()
+		else
+			http.redirect(luci.dispatcher.build_url("admin","security","process"))
 		end
 	elseif http_method == "GET" then
 		luci.template.render("admin_security/password",{
@@ -153,6 +189,29 @@ function Device_page()
 	end
 end
 
+function unauth_device()
+	local http_method = http.getenv("REQUEST_METHOD")
+	if http_method == "POST" then
+		local dname = http.formvalue("device_name")
+		if dname~=nil then
+			message = add_devices()
+			luci.template.render("admin_security/unauth_device",{
+				TODO = message
+			})
+		else 
+			http.redirect(luci.dispatcher.build_url("admin","security","unauth_device"))
+		end
+	elseif http_method == "GET" then
+		luci.template.render("admin_security/unauth_device",{
+			TODO = ""
+		})
+	else
+		luci.template.render("admin_security/unauth_device",{
+			TODO = ""
+		})
+	end
+end
+
 function Rule_General()                                 
         local http_method = http.getenv("REQUEST_METHOD")
         if http_method == "POST" then                  
@@ -160,7 +219,7 @@ function Rule_General()
 		local delete = http.formvalue("delete")
                 local accept = http.formvalue("accept")
                 local reject = http.formvalue("reject")
-                local accept_all_rule = http.formvalue("accept_all_rule")
+                --local accept_all_rule = http.formvalue("accept_all_rule")
 		local src_vlan = http.formvalue("src_vlan")
 		if delete~=nil then      
                         delete_rule()    
@@ -170,8 +229,8 @@ function Rule_General()
                         reject_rule_general()
                 elseif src_vlan ~= nil then              
                         add_rule()
-		elseif accept_all_rule ~= nil then
-			accept_all_rules()
+		--elseif accept_all_rule ~= nil then
+		--	accept_all_rules()
                 end                                  
 		http.redirect(luci.dispatcher.build_url("admin","security","rule","rules_1"));
         end                                          
@@ -181,7 +240,229 @@ function Rule_General()
         	links = GenerateLinks(),
 		nodes = GenerateNodes()
 	})
-end        
+end   
+
+function unauth_perm_rule_table(vlan)
+	local x = luci.model.uci.cursor()
+	local flag = false
+	local permanent_table = '<table style="width:100%;margin:0px">' ..                           
+        "<tr>" ..                                                                                      
+                "<td>Message</td>" ..                                                                
+                "<td width=\"55\">Verdict</td>" ..                                     
+                "<td width=\"48\"></td>" ..                                            
+        "</tr>"
+	x:foreach("dreamcatcher","rule",function(s)
+		local IcName = s[".name"]
+		local approved = x:get("dreamcatcher",IcName,"approved")
+		if approved == "1" then
+                        permanent_table = permanent_table .. "<tr>\n"
+			local src_device = ""                                                                                                  
+                        local dst_device = ""                                                                                                  
+                        local device_name = ""                                                                                                 
+                        local src_vlan = x:get("dreamcatcher",IcName,"src_vlan")                                                               
+                        local dst_vlan = x:get("dreamcatcher",IcName,"dst_vlan")
+			if src_vlan == vlan or dst_vlan == vlan then
+				flag = true
+				if src_vlan == nil then                                                                                                
+                        	        src_device = "Unknown device"                                                                                  
+                        	else                                                                                                                   
+                        	        src_device = GetDeviceName(src_vlan)                                                                           
+                        	end                                                                                                                    
+                        	if dst_vlan == nil then                                                                                                
+                        	        dst_device = "Unknown device"                                                                           
+                        	else                                                                                                                   
+                        	        dst_device = GetDeviceName(dst_vlan)                                                                           
+                        	end
+                        	                                                                                            
+                        	local device_name = x:get("dreamcatcher",IcName,"device_name")                                                         
+                        	if device_name == nil then                                                                                             
+                        	        device_name = "Unknown device"                                                                              
+                        	end                                                                                                                    
+                        	local type = x:get("dreamcatcher",IcName,"type")                                                                    
+                        	local message = GetTitle(src_device,dst_device,device_name,type) 
+				--local message = x:get("dreamcatcher",IcName,"message")                                                                                                                              
+                        	permanent_table = permanent_table .. "<td>" .. message .. "</td>\n"
+				local verdict = x:get("dreamcatcher",IcName,"verdict")                                           
+                        	if verdict ~= nil then                                                                           
+                        	        permanent_table = permanent_table .. "<td>" .. verdict .. "</td>\n"                      
+                        	else                                                                                             
+                        	        permanent_table = permanent_table .. "<td></td>\n"                
+                       		end
+				permanent_table = permanent_table                                           
+                        	        .. '<td><form style="margin:0px;display: inline" id="' .. IcName .. "delete" .. '" action="" method="POST">'
+                        	        .. '<input type="hidden" name="delete" value="' .. IcName .. '"></input>'                              
+                        	if dst_vlan == vlan then
+					permanent_table = permanent_table .. '<input type="button" onclick="modify_rule(\'' .. IcName .. '\',\'delete\')" value="Delete"></input>'
+                        	end
+                        	permanent_table = permanent_table .. "</form></td></tr>" 
+			end
+		end
+	end
+	)
+	x:foreach("dreamcatcher","dpi_rule",function(s)                                                                                         
+                local IcName = s[".name"]                                                                                                      
+                local approved = x:get("dreamcatcher",IcName,"approved")                                                                        
+                if approved == "1" then                                                                                                            
+                        permanent_table = permanent_table .. "<tr>\n"                                                                          
+                        local src_device = ""                                                                                                  
+                        local dst_device = ""                                                                                                  
+                        local device_name = ""                                                                                                 
+                        local src_vlan = x:get("dreamcatcher",IcName,"src_vlan")                                                        
+                        local dst_vlan = x:get("dreamcatcher",IcName,"dst_vlan")
+			if src_vlan == vlan or dst_vlan == vlan then
+				flag = true
+				if src_vlan == nil then                                                                                                
+                        	        src_device = "Unknown device"                                                                           
+                        	else                                                                                                                   
+                        	        src_device = GetDeviceName(src_vlan)                                                                           
+                        	end                                                                                                                    
+                        	if dst_vlan == nil then                                                                                                
+                        	        dst_device = "Unknown device"                                                                                  
+                        	else                                                                                                                   
+                        	        dst_device = GetDeviceName(dst_vlan)                                                                           
+                        	end                                                                                                                 
+                        	local device_name = x:get("dreamcatcher",IcName,"device_name")                                                         
+                        	if device_name == nil then                                                                                          
+                               		device_name = "Unknown device"                                                                                 
+                        	end                                                                                                                 
+                        	local type = x:get("dreamcatcher",IcName,"type")                                                                       
+                        	local message = GetTitle(src_device,dst_device,device_name,type)                                                
+                        	--local message = x:get("dreamcatcher",IcName,"message")                                                               
+                        	permanent_table = permanent_table .. "<td>" .. message .. "</td>\n"                                                    
+                        	local verdict = x:get("dreamcatcher",IcName,"verdict")                                                                 
+                        	if verdict ~= nil then                                                                                                 
+                        	        permanent_table = permanent_table .. "<td>" .. verdict .. "</td>\n"                                            
+                        	else                                                                                                                   
+                        	        permanent_table = permanent_table .. "<td></td>\n"                                                             
+                        	end                                                                                                                    
+                        	permanent_table = permanent_table                                                                               
+                                	.. '<td><form style="margin:0px;display: inline" id="' .. IcName .. "delete" .. '" action="" method="POST">'   
+                                	.. '<input type="hidden" name="delete" value="' .. IcName .. '"></input>'                                   
+                                if dst_vlan == vlan then
+					permanent_table = permanent_table .. '<input type="button" onclick="modify_rule_2(\'' .. IcName .. '\',\'delete\')" value="Delete"></input>'       
+                                end                                                                                           
+                        	permanent_table = permanent_table .. "</form></td></tr>"                                                                        
+                	end
+		end                                                                                                                         
+        end                                                                                                                                 
+        )
+	permanent_table = permanent_table .. "</table>"
+	if flag == true then
+		return permanent_table
+	else
+	        return "<table style=\"width=100%;margin:0px\"><tr><td>Currently no rules</td></tr></table>"                                                                      
+	end
+end
+
+function unauth_temp_rule_table(vlan)
+	local x = luci.model.uci.cursor()                                                                                              
+        local flag = false                                                                               
+        local temp_table = '<table style="width:100%;margin:0px">' ..                                                                  
+        "<tr>" ..                                                                                        
+                "<td>Message</td>" ..                                                                                                  
+                "<td width=\"150\"<td>" ..                                                                                             
+        "</tr>"
+	x:foreach("dreamcatcher","rule",function(s)
+		local IcName = s[".name"]
+		local approved = x:get("dreamcatcher",IcName,"approved")
+		if approved == "0" then
+			flag = true
+			temp_table = temp_table .. "<tr>\n"
+			local src_device = ""
+			local dst_device = ""
+			local device_name = ""
+                        local src_vlan = x:get("dreamcatcher",IcName,"src_vlan")
+			local dst_vlan = x:get("dreamcatcher",IcName,"dst_vlan")
+			if dst_vlan == vlan then
+				if src_vlan == nil then
+					src_device = "Unknown device"
+				else
+					src_device = GetDeviceName(src_vlan)
+				end
+				if dst_vlan == nil then
+					dst_device = "Unknown device"
+				else
+					dst_device = GetDeviceName(dst_vlan)
+				end
+				local device_name = x:get("dreamcatcher",IcName,"device_name")
+				if device_name == nil then
+					device_name = "Unknown device"
+				end
+				local type = x:get("dreamcatcher",IcName,"type")
+				local message = GetTitle(src_device,dst_device,device_name,type)
+				--local message = x:get("dreamcatcher",IcName,"message")                                                                                                                              
+                        	temp_table = temp_table .. "<td>" .. message .. "</td>\n" 			
+				temp_table = temp_table .. "<td>"                                                                              
+                        		.. '<form style="margin:0px;display:inline" id="' .. IcName .. "accept" .. '" action="" method="POST">'
+                        		.. '<input type="hidden" name="accept" value="' .. IcName .. '"></input>'                              
+                        		.. '<input type="button" onclick="modify_rule(\'' .. IcName .. '\',\'accept\')" value="Accept"></input>'
+                        		.. '</form>'                                                                                           
+                        		.. '<form style="margin:0px;display:inline" id="' .. IcName .. "reject" .. '" action="" method="POST">'
+                        		.. '<input type="hidden" name="reject" value="' .. IcName .. '"></input>'                              
+                        		.. '<input type="button" onclick="modify_rule(\'' .. IcName .. '\',\'reject\')" value="Reject"></input>'
+                        		.. '</form>'                                                                                           
+                        		.. '<form style="margin:0px;display:inline" id="' .. IcName .. "delete" .. '" action="" method="POST">'
+                        		.. '<input type="hidden" name="delete" value="' .. IcName .. '"></input>'                              
+                        		.. '<input type="button" onclick="modify_rule(\'' .. IcName .. '\',\'delete\')" value="Delete"></input>'
+                        		.. '</form></td>'                                                                                      
+                        	temp_table = temp_table .. "</tr>"
+			end
+		end	
+	end)
+	x:foreach("dreamcatcher","dpi_rule",function(s)                                                         
+                local IcName = s[".name"]                                                                   
+                local approved = x:get("dreamcatcher",IcName,"approved")                                        
+                if approved == "0" then                                                                         
+                        temp_table = temp_table .. "<tr>\n"                                                 
+                        local src_device = ""                                                               
+                        local dst_device = ""                                                               
+                        local device_name = ""                                                              
+                        local src_vlan = x:get("dreamcatcher",IcName,"src_vlan")                            
+                        local dst_vlan = x:get("dreamcatcher",IcName,"dst_vlan")
+			if dst_vlan == vlan then
+				flag = true
+				if src_vlan == nil then                                                             
+                        	        src_device = "Unknown device"                                               
+                        	else                                                                                
+                        	        src_device = GetDeviceName(src_vlan)                                        
+                        	end                                                                                 
+                        	if dst_vlan == nil then                                                             
+                        	        dst_device = "Unknown device"                                               
+                        	else                                                                                
+                        	        dst_device = GetDeviceName(dst_vlan)                                        
+                        	end                                                                                 
+                        	local device_name = x:get("dreamcatcher",IcName,"device_name")                      
+                        	if device_name == nil then                                                          
+                        	        device_name = "Unknown device"                                              
+                        	end                                                                                 
+                        	local type = x:get("dreamcatcher",IcName,"type")                                    
+                        	local message = GetTitle(src_device,dst_device,device_name,type)                    
+                        	--local message = x:get("dreamcatcher",IcName,"message")                            
+                        	temp_table = temp_table .. "<td>" .. message .. "</td>\n"                           
+                        	temp_table = temp_table .. "<td>"                                                                              
+                        		.. '<form style="margin:0px;display:inline" id="' .. IcName .. "accept" .. '" action="" method="POST">'
+                        		.. '<input type="hidden" name="accept" value="' .. IcName .. '"></input>'                              
+                        		.. '<input type="button" onclick="modify_rule_2(\'' .. IcName .. '\',\'accept\')" value="Accept"></input>'
+                        		.. '</form>'                                                                                           
+                        		.. '<form style="margin:0px;display:inline" id="' .. IcName .. "reject" .. '" action="" method="POST">'
+                        		.. '<input type="hidden" name="reject" value="' .. IcName .. '"></input>'                              
+                        		.. '<input type="button" onclick="modify_rule_2(\'' .. IcName .. '\',\'reject\')" value="Reject"></input>'
+                        		.. '</form>'                                                                                           
+                        		.. '<form style="margin:0px;display:inline" id="' .. IcName .. "delete" .. '" action="" method="POST">'
+                        		.. '<input type="hidden" name="delete" value="' .. IcName .. '"></input>'                              
+                        		.. '<input type="button" onclick="modify_rule_2(\'' .. IcName .. '\',\'delete\')" value="Delete"></input>'
+                        		.. '</form></td>'                                                                                      
+                        	temp_table = temp_table .. "</tr>"                                                  
+            		end
+		end            	                                                                             
+        end)
+	temp_table = temp_table .. "</table>"
+	if flag == true then
+		return temp_table
+	else
+		return "<table style=\"width=100%;margin:0px\"><tr><td>Currently no rules</td></tr></table>"
+	end
+end
 
 function Rule_Advanced()
 	local http_method = http.getenv("REQUEST_METHOD")
@@ -1220,10 +1501,11 @@ function add_devices()
 	else                                                                                                                                                                                      
         		message = '<pre><span class="inner-pre" style="font-size:20px">Duplicate device name or resubmision of the same form</span></pre>'                                                                                                      
         end                                                                                                                                                                                       
-        luci.template.render("admin_security/password",{                                                                                                                                          
-        	TODO = message,                                                                                                                                                                   
-                table_text = GenerateTable()                                                                                                                                                      
-        })
+        --luci.template.render("admin_security/password",{                                                                                                                                          
+        --	TODO = message,                                                                                                                                                                   
+        --    table_text = GenerateTable()                                                                                                                                                      
+        --})
+        return message
 end
 
 function GetDeviceName(vlan)                                                                                                           
