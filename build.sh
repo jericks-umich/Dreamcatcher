@@ -37,6 +37,7 @@ done
 # do installation of dependencies, but only if -i IS present
 if [ "$INSTALL" == "1" ] ; then
 	echo "Installing dependencies. Need your sudo password."
+	sudo apt-get update
 	sudo apt-get install $DEPS $XTABLES_DEPS
 fi
 
@@ -96,8 +97,8 @@ if [ "$SETUP" == "1" ] ; then
 	# build feed indices (this was stolen and modified from scripts/feeds)
 	pushd $OPENWRT_DIR/feeds
 	for feed in {packages, luci, routing, telephony, management, targets}; do
-		-d "./feeds/$name.tmp" or mkdir "./feeds/$name.tmp" or return 1;
-		-d "./feeds/$name.tmp/info" or mkdir "./feeds/$name.tmp/info" or return 1;
+		mkdir -p "./feeds/$name.tmp"
+		mkdir -p "./feeds/$name.tmp/info"
 
 		make -s prepare-mk OPENWRT_BUILD= TMP_DIR=\"$OPENWRT_DIR/feeds/$feed.tmp\"
 		make -s -f include/scan.mk IS_TTY=1 SCAN_TARGET=\"packageinfo\" SCAN_DIR=\"feeds/$feed\" SCAN_NAME=\"package\" SCAN_DEPS=\"$OPENWRT_DIR/include/package*.mk\" SCAN_DEPTH=5 SCAN_EXTRA=\"\" TMP_DIR=\"$OPENWRT_DIR/feeds/$feed.tmp\"
