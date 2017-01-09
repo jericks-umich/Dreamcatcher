@@ -95,14 +95,15 @@ if [ "$SETUP" == "1" ] ; then
 	popd
 
 	# build feed indices (this was stolen and modified from scripts/feeds)
-	pushd $OPENWRT_DIR/feeds
-	for feed in {packages, luci, routing, telephony, management, targets}; do
-		mkdir -p "./feeds/$name.tmp"
-		mkdir -p "./feeds/$name.tmp/info"
+	pushd $OPENWRT_DIR/
+	for feed in packages luci routing telephony management targets; do
+		mkdir -p "./feeds/$feed.tmp"
+		mkdir -p "./feeds/$feed.tmp/info"
 
-		make -s prepare-mk OPENWRT_BUILD= TMP_DIR=\"$OPENWRT_DIR/feeds/$feed.tmp\"
-		make -s -f include/scan.mk IS_TTY=1 SCAN_TARGET=\"packageinfo\" SCAN_DIR=\"feeds/$feed\" SCAN_NAME=\"package\" SCAN_DEPS=\"$OPENWRT_DIR/include/package*.mk\" SCAN_DEPTH=5 SCAN_EXTRA=\"\" TMP_DIR=\"$OPENWRT_DIR/feeds/$feed.tmp\"
-		make -s -f include/scan.mk IS_TTY=1 SCAN_TARGET=\"targetinfo\" SCAN_DIR=\"feeds/$feed\" SCAN_NAME=\"target\" SCAN_DEPS=\"profiles/*.mk $OPENWRT_DIR/include/target.mk\" SCAN_DEPTH=5 SCAN_EXTRA=\"\" SCAN_MAKEOPTS=\"TARGET_BUILD=1\" TMP_DIR=\"$OPENWRT_DIR/feeds/$feed.tmp\"
+		export TOPDIR=$OPENWRT_DIR
+		make -s prepare-mk OPENWRT_BUILD= TMP_DIR="$OPENWRT_DIR/feeds/$feed.tmp"
+		make -s -f include/scan.mk IS_TTY=1 SCAN_TARGET="packageinfo" SCAN_DIR="feeds/$feed" SCAN_NAME="package" SCAN_DEPS="$OPENWRT_DIR/include/package*.mk" SCAN_DEPTH=5 SCAN_EXTRA="" TMP_DIR="$OPENWRT_DIR/feeds/$feed.tmp"
+		make -s -f include/scan.mk IS_TTY=1 SCAN_TARGET="targetinfo" SCAN_DIR="feeds/$feed" SCAN_NAME="target" SCAN_DEPS="profiles/*.mk $OPENWRT_DIR/include/target.mk" SCAN_DEPTH=5 SCAN_EXTRA="" SCAN_MAKEOPTS="TARGET_BUILD=1" TMP_DIR="$OPENWRT_DIR/feeds/$feed.tmp"
 		ln -sf $feed.tmp/.packageinfo ./feeds/$feed.index
 		ln -sf $feed.tmp/.targetinfo ./feeds/$feed.targetindex
 	done
@@ -141,6 +142,8 @@ fi
 #cat $CONFIG_DIR/dreamcatcher.diff >> $OPENWRT_DIR/.config
 make defconfig
 popd
+
+read
 
 #### PATCHES ####
 # add patches to openwrt
