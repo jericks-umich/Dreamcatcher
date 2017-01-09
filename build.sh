@@ -143,8 +143,6 @@ fi
 make defconfig
 popd
 
-read
-
 #### PATCHES ####
 # add patches to openwrt
 echo "Linking patches to openwrt build..."
