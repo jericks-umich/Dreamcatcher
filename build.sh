@@ -166,6 +166,8 @@ ln -s $PATCH_DIR/704-dreamcatcher-mdns-rule.patch $OPENWRT_DIR/package/network/c
 rm $OPENWRT_DIR/package/network/config/firewall/patches/705-dreamcatcher-unicast-broadcast-priority.patch 2>/dev/null
 ln -s $PATCH_DIR/705-dreamcatcher-unicast-broadcast-priority.patch $OPENWRT_DIR/package/network/config/firewall/patches/705-dreamcatcher-unicast-broadcast-priority.patch
 # xtables-addons - add support for native iptables mdns module
+rm $OPENWRT_DIR/package/network/utils/iptables/patches/706-dreamcatcher-iptables-mdns.patch 2>/dev/null
+ln -s $PATCH_DIR/706-dreamcatcher-iptables-mdns.patch $OPENWRT_DIR/package/network/utils/iptables/patches/706-dreamcatcher-iptables-mdns.patch
 rm $OPENWRT_DIR/package/network/utils/xtables-addons/patches/706-dreamcatcher-xtables-mdns.patch 2>/dev/null
 ln -s $PATCH_DIR/706-dreamcatcher-xtables-mdns.patch $OPENWRT_DIR/package/network/utils/xtables-addons/patches/706-dreamcatcher-xtables-mdns.patch
 rm $OPENWRT_DIR/target/linux/generic/patches-4.1/706-dreamcatcher-xtables-mdns-kernel.patch 2>/dev/null
@@ -177,9 +179,17 @@ ln -s $PATCH_DIR/210-openssl-1.1.x-compat.patch $OPENWRT_DIR/tools/mkimage/patch
 rm $OPENWRT_DIR/package/feeds/packages/freeradius2/patches/707-dreamcatcher-freeradius2-fix-openssl-1.1.x-update.patch 2>/dev/null
 ln -s $PATCH_DIR/707-dreamcatcher-freeradius2-fix-openssl-1.1.x-update.patch $OPENWRT_DIR/package/feeds/packages/freeradius2/patches/707-dreamcatcher-freeradius2-fix-openssl-1.1.x-update.patch
 
+# patch the iptables/xtables makefiles so it builds and includes the mdns module
+pushd $OPENWRT_DIR
+git apply $PATCH_DIR/mdns_makefiles.patch
+popd
+
 # weird download error -- can't find a particular version of the ca-certificates package on any mirror? Weird.
 # patch the Makefile to retrieve a ~5 day older version
-cp $CONFIG_DIR/ca-certificates_updated.Makefile $OPENWRT_DIR/package/system/ca-certificates/
+pushd $OPENWRT_DIR
+git apply $PATCH_DIR/ca-certificates_old_version.patch
+#cp $CONFIG_DIR/ca-certificates_updated.Makefile $OPENWRT_DIR/package/system/ca-certificates/
+popd
 
 
 
