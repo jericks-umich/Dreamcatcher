@@ -1,0 +1,361 @@
+--- /dev/null
++++ b/net/netfilter/xt_mdns.c
+@@ -0,0 +1,261 @@
++#include <linux/string.h>
++#include <linux/module.h>
++#include <linux/skbuff.h>
++#include <linux/netfilter/x_tables.h>
++#include <net/ip.h>
++#include <linux/udp.h>
++
++#include "xt_mdns.h"
++#include "dns.h"
++//#include "compat_xtables.h"
++
++
++#define DEBUG 1
++
++static bool xt_mdns_mt(const struct sk_buff* skb, struct xt_action_param* par) {
++  const struct iphdr* ip;
++  const struct udphdr* udp;
++  const struct dns_header* dns;
++
++  const struct xt_mdns_mtinfo* info = par->matchinfo;
++  ip = ip_hdr(skb);
++  // just point to the relevant bytes in the packet rather than copying it
++  //udp = skb_header_pointer(skb, par->thoff, sizeof(*udp), udp_buf)
++  udp = (struct udphdr*)(((void*)ip) + par->thoff);
++
++  // first check, make sure this is a UDP port 5353 packet (don't actually check, but all of our rules should first be filtered by port 5353)
++  //if (udp->dest != 5353) {
++  //  return false; // then we can't match
++  //}
++
++  dns = (dns_header*)(((void*)udp) + sizeof(*udp)); // UDP header is always 8 bytes
++
++  if (info->type == XT_MDNS_TYPE_DISCOVERY && dns->qr == 0) { // if this is a discovery rule and also a discovery packet
++    return true;
++  } else if (info->type == XT_MDNS_TYPE_ADVERTISEMENT && dns->qr == 1) { // if this is an advertisement rule and also an advertisement packet
++    // make sure that for each answer in the dns packet, the name matches one of the approved names in the ipt rule
++    return advertisement_match(info, dns, (unsigned char*)dns);
++  }
++  // else
++  return false;
++}
++
++// takes in our info stuct and a given device name pulled out of the mDNS packet
++// returns true if the device name is approved by our info struct, and false otherwise
++bool device_name_approved(const struct xt_mdns_mtinfo* info, char* device_name) {
++  int i;
++  for (i=0; i < XT_MDNS_MAX_NAMES; i++) {
++    if ((*(info->names[i])) == '\0') { // if we don't have another name to check against
++      return false; // then, since we haven't found a name match, we can't approve the name
++    }
++    if (strncmp(info->names[i], device_name, XT_MDNS_MAX_NAME_SIZE) == 0) { // if our device name matches this approved name
++      return true;
++    }
++  }
++  // if we get here, then we didn't find a match, so don't approve
++  return false;
++}
++
++// Takes in a list of approved mDNS names and the DNS header (and payload as raw bytes from start of dns header)
++// Returns true if all DNS names in the packet are approved, and false otherwise
++// Note: Allows DNS names for special dns-sd names
++bool advertisement_match(const struct xt_mdns_mtinfo* info, const struct dns_header* dns, unsigned char* dns_raw) {
++  int i;
++  char buf[DEVICE_NAME_SIZE];
++  char temp_buf[DEVICE_NAME_SIZE]; // used only in PTR record
++  int name_length;
++  u_int16_t type;
++  u_int16_t data_len;
++  unsigned char* ptr = dns_raw + sizeof(*dns); // pointer to start of question/answer section in DNS packet
++  
++  // skip over questions
++  for (i=0; i < dns->questions; i++) {
++    ptr = skip_question(ptr); // skips the question we're currently looking at
++  }
++  // after questions come Answer Resource Requests, which we want to match
++  // against the approved names in our info struct
++  for (i=0; i < dns->answer_rr; i++) { // iterate over the answers
++    name_length = read_dns_name(dns_raw, ptr, buf); // put name in buf
++    ptr += name_length; // move ptr forward to type section
++    type = ntohs(*(u_int16_t*)ptr); // translate from network byte order to host byte order
++    ptr += 8; // move ptr past the TYPE (2 bytes), CLASS (2 bytes), and TTL (4 bytes) fields
++    data_len = ntohs(*(u_int16_t*)ptr); // translate from network byte order to host byte order
++    ptr += 2; // move ptr past the RDLENGTH field
++    // if type is A, AAAA, SRV, TXT, use response from read_dns_name as device name
++    // if type is PTR, SRV, read the RDATA field for the device name (or 2nd device name in case of SRV)
++    // special case for PTR records, if name starts with _services._dns-sd.*, we check domain for _<proto>._<proto>.*, and if so, completely ignore this answer (allowing the packet, if otherwise the case)
++    switch (type) {
++      case A : 
++      case TXT :
++      case AAAA :
++        if (device_name_approved(info, buf) == false) { // check against the name we got above from the "Name" field
++          return false;
++        }
++        break;
++      case PTR :
++#define SERVICES_STR "_services._dns-sd."
++        if (strncmp(buf, SERVICES_STR, sizeof(SERVICES_STR)) == 0) { // if name matches services prefix, check for special case
++          read_dns_name(dns_raw, ptr, buf);
++          // check that first two segments of domain start with underscores, as the spec (https://tools.ietf.org/html/rfc6763#section-9) says they should
++          strncpy(temp_buf, buf, DEVICE_NAME_SIZE);
++          if (strncmp(strsep((char**)&temp_buf, "."), "_", 1) == 0 &&
++              strncmp(strsep((char**)&temp_buf, "."), "_", 1) == 0) { // they do!
++            break; // don't check this device name
++          } else { // weird, name matches services prefix, but domain doesn't conform
++            pr_info("Weird case. DNS name starts with _services._dns-sd., but domain doesn't start with underscores.");
++            if (device_name_approved(info, buf) == false) { // check against the name we just got from the "Rdata" field
++              return false;
++            }
++            break; 
++          }
++        }
++        // if we get here, then this is a normal PTR record, not one starting with _services._dns-sd
++        read_dns_name(dns_raw, ptr, buf);
++        if (device_name_approved(info, buf) == false) { // check against the name we just got from the "Rdata" field
++          return false;
++        }
++        break;
++      case SRV :
++        // check first device name from above
++        if (device_name_approved(info, buf) == false) {
++          return false;
++        }
++        // check second device name as target field
++        read_dns_name(dns_raw, ptr+6, buf); // first 6 bytes are priority, weight, port
++        // http://www.tahi.org/dns/packages/RFC2782_S4-1_0_0/SV/SV_RFC2782_SRV_rdata.html
++        if (device_name_approved(info, buf) == false) {
++          return false;
++        }
++        break;
++      default :
++        pr_warn("Unsupported DNS answer type: %u", type);
++        return false;
++    }
++    ptr += data_len; // move p past RDATA field, ready for next iteration
++  }
++
++  // if we've parsed the packet and all names are approved, then we can approve this packet!
++  return true;
++}
++
++// reads from ptr the dns name using dns's weird encoding
++// uses payload in case ptr refers to a location of a previous substring
++// if not passed in as NULL, buf is filled with the resulting string
++// returns the length read, in bytes (Note: if we hit a pointer, it returns the number of bytes from the start to the end of the pointer, not the length of the name returned)
++// NOTE: make sure this is the start of a name section, because this function cannot tell and will behave erratically if not
++// NOTE: This ONLY reads the name until it gets to a null byte. It does not include, for instance, the 4 bytes for QTYPE/QCLASS fields in a question
++unsigned int read_dns_name(unsigned char* payload, unsigned char* start, char* buf) {
++  int num_bytes = 0; // return value; can be set at any time if we hit a reference, or if we get to end, will be set 
++  unsigned char* ptr = start;
++  u_int16_t offset; // offset into payload; used when we have a pointer
++  if (buf != NULL) {
++    *buf = '\0'; // clear buf, just in case
++  }
++  // iterate until we reach a null byte
++  while (*ptr != 0) {
++    // check if next segment is a reference 
++    if ((*ptr & 192) == 192) { // it's a pointer if first two bits are set 0b11000000
++      // pointer is two bytes, network order
++      offset = ntohs(*(u_int16_t*)ptr); // get offset (including flag bits)
++      offset &= 16383; // mask off flag bits (mask == 0b0011111111111111)
++      if (num_bytes == 0) { // if num_bytes isn't set yet, aka this is the first pointer
++        num_bytes = (ptr+2) - start; // how many bytes has ptr gone?
++      }   
++      ptr = payload + offset; // set ptr to next segment
++    } else { // not a pointer, so add next segment
++      if (buf != NULL) { 
++        snprintf(buf, DEVICE_NAME_SIZE, "%s%.*s", buf, *ptr, (ptr+1)); // append next segment of device name
++      }
++      ptr += ((*ptr) + 1); // ptr points at the number of characters in this segment of the name, so move it to the end of the segment
++      if (buf != NULL && *ptr != 0) { // if we're going to add another segment
++        snprintf(buf, DEVICE_NAME_SIZE, "%s.", buf); // append a '.' character between segments
++      } 
++    }   
++  }
++  if (num_bytes == 0) { // if num_chars hasn't been set yet, aka there were no pointers in this name
++    // when ptr == '\0' to end the string, we need to move 1 byte more to get past it
++    num_bytes = (ptr+1) - start; // how many bytes has ptr gone?
++  }
++  if (num_bytes < 0) { // this should never happen, even if packet is invalid -- it means our arithmetic is off
++    pr_warn("We have a bug! grep source code for ID: 0x2179");
++    //pr_warn("We have a bug! payload: 0x%x, start: 0x%x, ptr: 0x%x, buf: %s", payload, start, ptr, buf);
++  }
++  return (unsigned int) num_bytes;
++}
++
++
++// returns a pointer to after the dns question
++unsigned char* skip_question(unsigned char* p) {
++  // p currently points at the start of a question
++
++  // a question section is made up of two parts, the name (variable length) and
++  // the type/class. The name can have a pointer in it to a name or partial
++  // name from somewhere earlier in the packet
++
++  // here, we skip the variable length name, a series of lengths (in bytes) of the 
++  // current name segment, eventually terminated by a null-length byte.
++  // Example: "my.printer.local" becomes (in mixed hex/ascii, each byte is separated by a space):
++  //   0x02 m y 0x07 p r i n t e r 0x05 l o c a l 0x00
++  unsigned char* ptr = p;
++  while (*ptr != 0) {
++    // DNS allows pointers to previous sections, even in the middle of a name
++    if ((*p & 192) == 192) { // it's a pointer if first two bits are set 0b11000000
++      return p+2; // skip the two-byte pointer and we're done (now pointing at the next question or next section)
++    } else {
++      ptr += ((*ptr) + 1); // ptr points at the number of characters in this segment of the name, so move it to the end of the segment
++      // in our example above, we start at 0x02, jump forward 3 bytes to 0x07,
++      // jump forward 8 bytes to 0x05, jump forward 6 bytes to 0x00, and then 
++      // exit the loop
++    }
++  }
++  // after the name is done, there are the null byte ptr is pointing at and QTYPE and QCLASS fields, each is 2 bytes
++  return ptr+5;
++}
++
++
++#if DEBUG
++static int xt_mdns_mt_check(const struct xt_mtchk_param *par)
++{
++  const struct xt_mdns_mtinfo* info = par->matchinfo;
++  pr_info("Added %s rule with -m mdns in the %s table.\n", 
++      (info->type == XT_MDNS_TYPE_DISCOVERY ? "discovery" : "advertisement"), par->table);
++  return 0;
++}
++
++static void xt_mdns_mt_destroy(const struct xt_mtdtor_param *par)
++{
++  const struct xt_mdns_mtinfo* info = par->matchinfo;
++  pr_info("%s mdns rule removed.", info->type == XT_MDNS_TYPE_DISCOVERY ? "Discovery" : "Advertisement");
++}
++#endif // DEBUG
++
++static struct xt_match xt_mdns_mt_reg __read_mostly = {
++  .name       = "mdns",
++  .revision   = 0,
++  .family     = NFPROTO_IPV4,
++  .proto      = IPPROTO_UDP, // only match UDP traffic
++  .match      = xt_mdns_mt,
++#if DEBUG
++  .checkentry = xt_mdns_mt_check,
++  .destroy    = xt_mdns_mt_destroy,
++#endif // DEBUG
++  .matchsize  = sizeof(struct xt_mdns_mtinfo),
++  .me         = THIS_MODULE,
++};
++
++static int __init xt_mdns_mt_init(void) {
++  return xt_register_match(&xt_mdns_mt_reg);
++}
++
++static void __exit xt_mdns_mt_exit(void) {
++  xt_unregister_match(&xt_mdns_mt_reg);
++}
++
++module_init(xt_mdns_mt_init);
++module_exit(xt_mdns_mt_exit);
++
++MODULE_ALIAS("ipt_mdns");
++MODULE_AUTHOR("Jeremy Erickson, jericks@umich.edu");
++MODULE_DESCRIPTION("Xtables extension: Match mDNS discovery or advertisement packets with specific names");
++MODULE_LICENSE("GPLv3");
++
+--- a/net/netfilter/Makefile
++++ b/net/netfilter/Makefile
+@@ -172,6 +172,7 @@ obj-$(CONFIG_NETFILTER_XT_MATCH_STATISTI
+ obj-$(CONFIG_NETFILTER_XT_MATCH_STRING) += xt_string.o
+ obj-$(CONFIG_NETFILTER_XT_MATCH_TCPMSS) += xt_tcpmss.o
+ obj-$(CONFIG_NETFILTER_XT_MATCH_TIME) += xt_time.o
++obj-$(CONFIG_NETFILTER_XT_MATCH_MDNS) += xt_mdns.o
+ obj-$(CONFIG_NETFILTER_XT_MATCH_U32) += xt_u32.o
+ 
+ # ipset
+--- /dev/null
++++ b/net/netfilter/dns.h
+@@ -0,0 +1,34 @@
++#ifndef DNS_H
++#define DNS_H
++
++// creating my own struct for the dns header because I can't find a good standard one
++// http://www.networksorcery.com/enp/protocol/dns.htm
++typedef struct dns_header {
++  __u16 id; 
++  // flags
++  //u_int16_t flags;
++  __u16 qr:1,     // Query/Response (0 is query, 1 response)
++        opcode:4, // Opcode
++        aa:1,     // Authoritative Answer
++        tc:1,     // Truncated
++        rd:1,     // Recursion Desired
++        ra:1,     // Recursion Available
++        z:1,      //  ... my reference didn't specify what this was for
++        ad:1,     // Authenticated Data
++        cd:1,     // Checking Disabled
++        rcode:4;  // Return Code
++  __u16 questions;
++  __u16 answer_rr;
++  __u16 authority_rr;
++  __u16 additional_rr;
++} dns_header;
++
++typedef enum {
++  A = 1,
++  PTR = 12, 
++  TXT = 16, 
++  AAAA = 28, 
++  SRV = 33
++} dns_type;
++
++#endif // DNS_H
+--- /dev/null
++++ b/net/netfilter/xt_mdns.h
+@@ -0,0 +1,28 @@
++#ifndef _LINUX_NETFILTER_XT_MDNS_H
++#define _LINUX_NETFILTER_XT_MDNS_H
++
++#include "dns.h"
++
++#define DEVICE_NAME_SIZE 128
++
++enum {
++  XT_MDNS_TYPE_DISCOVERY,
++  XT_MDNS_TYPE_ADVERTISEMENT,
++};
++
++// maximum number of mDNS names that can be associated with a device
++#define XT_MDNS_MAX_NAMES 16
++// maximum number of characters that can be used for a name
++#define XT_MDNS_MAX_NAME_SIZE 256
++
++struct xt_mdns_mtinfo {
++  __u8 type;
++  char names[XT_MDNS_MAX_NAMES][XT_MDNS_MAX_NAME_SIZE];
++};
++
++bool device_name_approved(const struct xt_mdns_mtinfo* info, char* device_name);
++bool advertisement_match(const struct xt_mdns_mtinfo* info, const struct dns_header* dns, unsigned char* dns_raw);
++unsigned int read_dns_name(unsigned char* payload, unsigned char* start, char* buf);
++unsigned char* skip_question(unsigned char* p);
++
++#endif // _LINUX_NETFILTER_XT_MDNS_H 
+--- a/net/netfilter/Kconfig
++++ b/net/netfilter/Kconfig
+@@ -1300,6 +1300,16 @@ config NETFILTER_XT_MATCH_PHYSDEV
+ 
+ 	  To compile it as a module, choose M here.  If unsure, say N.
+ 
++config NETFILTER_XT_MATCH_MDNS
++	tristate '"mdns" match support'
++	depends on NETFILTER_NETLINK_QUEUE
++	depends on NETFILTER_ADVANCED
++	help
++	  mdns matching matches against the discovery and advertisement
++	  messages in mdns packets.
++
++	  To compile it as a module, choose M here.  If unsure, say N.
++
+ config NETFILTER_XT_MATCH_PKTTYPE
+ 	tristate '"pkttype" packet type match support'
+ 	depends on NETFILTER_ADVANCED
