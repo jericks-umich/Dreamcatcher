@@ -32,9 +32,7 @@ LDFLAGS += -Wl,-rpath-link=$(STAGING_DIR)/usr/lib -lnetfilter_queue -luci -lnfne
 define Build/Compile
 	$(TARGET_CC) $(TARGET_CFLAGS) $(LDFLAGS) -I$(PKG_BUILD_DIR) -o $(PKG_BUILD_DIR)/dreamcatcher \
 		$(PKG_BUILD_DIR)/main.c \
-		$(PKG_BUILD_DIR)/config.c \
-		$(PKG_BUILD_DIR)/logger.c \
-		$(PKG_BUILD_DIR)/protocols.c
+		$(PKG_BUILD_DIR)/logger.c 
 endef
 
 define Package/dreamcatcher/install
