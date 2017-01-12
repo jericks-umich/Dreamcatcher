@@ -18,8 +18,6 @@
 #include <curl/curl.h>
 
 #include <main.h>
-#include <protocols.h>
-#include <config.h>
 #include <logger.h>
 
 #define TAG "MAIN"

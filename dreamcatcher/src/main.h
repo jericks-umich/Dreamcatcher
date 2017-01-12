@@ -12,9 +12,6 @@
 #include <netinet/udp.h>
 #include <netinet/ip_icmp.h>
 
-#include <protocols.h>
-#include <dns.h>
-
 #define QUEUE_NUM 4670
 
 
