@@ -1,0 +1,74 @@
+diff --git a/include/netfilter.mk b/include/netfilter.mk
+index c8e6a8b239..e00d76150c 100644
+--- a/include/netfilter.mk
++++ b/include/netfilter.mk
+@@ -97,6 +97,9 @@ $(eval $(call nf_add,IPT_EXTRA,CONFIG_NETFILTER_XT_MATCH_QUOTA, $(P_XT)xt_quota)
+ 
+ #$(eval $(call nf_add,IPT_EXTRA,CONFIG_IP_NF_TARGET_ROUTE, $(P_V4)ipt_ROUTE))
+ 
++# mdns
++
++$(eval $(call nf_add,IPT_MDNS,CONFIG_NETFILTER_XT_MATCH_MDNS, $(P_XT)xt_mdns))
+ 
+ # filter
+ 
+diff --git a/package/kernel/linux/modules/netfilter.mk b/package/kernel/linux/modules/netfilter.mk
+index a0a19b23a9..977ceba8bf 100644
+--- a/package/kernel/linux/modules/netfilter.mk
++++ b/package/kernel/linux/modules/netfilter.mk
+@@ -593,6 +593,23 @@ endef
+ 
+ $(eval $(call KernelPackage,ipt-extra))
+ 
++define KernelPackage/ipt-mdns
++  TITLE:=mdns module
++  KCONFIG:=$(KCONFIG_IPT_MDNS)
++  FILES:=$(foreach mod,$(IPT_MDNS-m),$(LINUX_DIR)/net/$(mod).ko)
++  #FILES:=$(LINUX_DIR)/net/netfilter/xt_mdns.ko
++  AUTOLOAD:=$(call AutoProbe,$(notdir $(IPT_MDNS-m)))
++  $(call AddDepends/ipt)
++endef
++
++define KernelPackage/ipt-mdns/description
++ Other Netfilter (IPv4) kernel module
++ Includes:
++ - mdns
++endef
++
++$(eval $(call KernelPackage,ipt-mdns))
++
+ 
+ define KernelPackage/ip6tables
+   SUBMENU:=$(NF_MENU)
+diff --git a/package/network/utils/iptables/Makefile b/package/network/utils/iptables/Makefile
+index 6f7529c736..b41de06fb7 100644
+--- a/package/network/utils/iptables/Makefile
++++ b/package/network/utils/iptables/Makefile
+@@ -216,6 +216,19 @@ define Package/iptables-mod-nfqueue/description
+ 
+ endef
+ 
++define Package/iptables-mod-mdns
++$(call Package/iptables/Module, +kmod-ipt-mdns)
++  TITLE:=Netfilter MDNS target
++endef
++
++define Package/iptables-mod-mdns/description
++ iptables extension for managing mdns packets
++
++ Includes:
++  - libxt_mdns
++
++endef
++
+ define Package/iptables-mod-hashlimit
+ $(call Package/iptables/Module, +kmod-ipt-hashlimit)
+   TITLE:=hashlimit matching
+@@ -549,6 +562,7 @@ $(eval $(call BuildPlugin,iptables-mod-tee,$(IPT_TEE-m)))
+ $(eval $(call BuildPlugin,iptables-mod-u32,$(IPT_U32-m)))
+ $(eval $(call BuildPlugin,iptables-mod-nflog,$(IPT_NFLOG-m)))
+ $(eval $(call BuildPlugin,iptables-mod-nfqueue,$(IPT_NFQUEUE-m)))
++$(eval $(call BuildPlugin,iptables-mod-mdns,$(IPT_MDNS-m)))
+ $(eval $(call BuildPackage,ip6tables))
+ $(eval $(call BuildPlugin,ip6tables-extra,$(IPT_IPV6_EXTRA-m)))
+ $(eval $(call BuildPlugin,ip6tables-mod-nat,$(IPT_NAT6-m)))

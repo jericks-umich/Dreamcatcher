@@ -13,7 +13,7 @@ CONFIG_DIR=$THIS_DIR/config
 PATCH_DIR=$THIS_DIR/patches
 DREAMCATCHER_DIR=$THIS_DIR/dreamcatcher
 LUCI_APP_DREAMCATCHER_DIR=$THIS_DIR/luci-app-dreamcatcher
-DEPS="git-core build-essential libssl-dev libncurses5-dev unzip gawk subversion quilt"
+DEPS="git-core build-essential libssl-dev libncurses5-dev unzip gawk subversion quilt zlib1g-dev"
 XTABLES_DEPS="pkg-config libxtables-dev libxtables12 xtables-addons-common xtables-addons-dkms xtables-addons-source"
 
 for arg in "$@"; do
@@ -37,6 +37,7 @@ done
 # do installation of dependencies, but only if -i IS present
 if [ "$INSTALL" == "1" ] ; then
 	echo "Installing dependencies. Need your sudo password."
+	sudo apt-get update
 	sudo apt-get install $DEPS $XTABLES_DEPS
 fi
 
@@ -94,14 +95,15 @@ if [ "$SETUP" == "1" ] ; then
 	popd
 
 	# build feed indices (this was stolen and modified from scripts/feeds)
-	pushd $OPENWRT_DIR/feeds
-	for feed in {packages, luci, routing, telephony, management, targets}; do
-		-d "./feeds/$name.tmp" or mkdir "./feeds/$name.tmp" or return 1;
-		-d "./feeds/$name.tmp/info" or mkdir "./feeds/$name.tmp/info" or return 1;
+	pushd $OPENWRT_DIR/
+	for feed in packages luci routing telephony management targets; do
+		mkdir -p "./feeds/$feed.tmp"
+		mkdir -p "./feeds/$feed.tmp/info"
 
-		make -s prepare-mk OPENWRT_BUILD= TMP_DIR=\"$OPENWRT_DIR/feeds/$feed.tmp\"
-		make -s -f include/scan.mk IS_TTY=1 SCAN_TARGET=\"packageinfo\" SCAN_DIR=\"feeds/$feed\" SCAN_NAME=\"package\" SCAN_DEPS=\"$OPENWRT_DIR/include/package*.mk\" SCAN_DEPTH=5 SCAN_EXTRA=\"\" TMP_DIR=\"$OPENWRT_DIR/feeds/$feed.tmp\"
-		make -s -f include/scan.mk IS_TTY=1 SCAN_TARGET=\"targetinfo\" SCAN_DIR=\"feeds/$feed\" SCAN_NAME=\"target\" SCAN_DEPS=\"profiles/*.mk $OPENWRT_DIR/include/target.mk\" SCAN_DEPTH=5 SCAN_EXTRA=\"\" SCAN_MAKEOPTS=\"TARGET_BUILD=1\" TMP_DIR=\"$OPENWRT_DIR/feeds/$feed.tmp\"
+		export TOPDIR=$OPENWRT_DIR
+		make -s prepare-mk OPENWRT_BUILD= TMP_DIR="$OPENWRT_DIR/feeds/$feed.tmp"
+		make -s -f include/scan.mk IS_TTY=1 SCAN_TARGET="packageinfo" SCAN_DIR="feeds/$feed" SCAN_NAME="package" SCAN_DEPS="$OPENWRT_DIR/include/package*.mk" SCAN_DEPTH=5 SCAN_EXTRA="" TMP_DIR="$OPENWRT_DIR/feeds/$feed.tmp"
+		make -s -f include/scan.mk IS_TTY=1 SCAN_TARGET="targetinfo" SCAN_DIR="feeds/$feed" SCAN_NAME="target" SCAN_DEPS="profiles/*.mk $OPENWRT_DIR/include/target.mk" SCAN_DEPTH=5 SCAN_EXTRA="" SCAN_MAKEOPTS="TARGET_BUILD=1" TMP_DIR="$OPENWRT_DIR/feeds/$feed.tmp"
 		ln -sf $feed.tmp/.packageinfo ./feeds/$feed.index
 		ln -sf $feed.tmp/.targetinfo ./feeds/$feed.targetindex
 	done
@@ -164,6 +166,8 @@ ln -s $PATCH_DIR/704-dreamcatcher-mdns-rule.patch $OPENWRT_DIR/package/network/c
 rm $OPENWRT_DIR/package/network/config/firewall/patches/705-dreamcatcher-unicast-broadcast-priority.patch 2>/dev/null
 ln -s $PATCH_DIR/705-dreamcatcher-unicast-broadcast-priority.patch $OPENWRT_DIR/package/network/config/firewall/patches/705-dreamcatcher-unicast-broadcast-priority.patch
 # xtables-addons - add support for native iptables mdns module
+rm $OPENWRT_DIR/package/network/utils/iptables/patches/706-dreamcatcher-iptables-mdns.patch 2>/dev/null
+ln -s $PATCH_DIR/706-dreamcatcher-iptables-mdns.patch $OPENWRT_DIR/package/network/utils/iptables/patches/706-dreamcatcher-iptables-mdns.patch
 rm $OPENWRT_DIR/package/network/utils/xtables-addons/patches/706-dreamcatcher-xtables-mdns.patch 2>/dev/null
 ln -s $PATCH_DIR/706-dreamcatcher-xtables-mdns.patch $OPENWRT_DIR/package/network/utils/xtables-addons/patches/706-dreamcatcher-xtables-mdns.patch
 rm $OPENWRT_DIR/target/linux/generic/patches-4.1/706-dreamcatcher-xtables-mdns-kernel.patch 2>/dev/null
@@ -175,9 +179,17 @@ ln -s $PATCH_DIR/210-openssl-1.1.x-compat.patch $OPENWRT_DIR/tools/mkimage/patch
 rm $OPENWRT_DIR/package/feeds/packages/freeradius2/patches/707-dreamcatcher-freeradius2-fix-openssl-1.1.x-update.patch 2>/dev/null
 ln -s $PATCH_DIR/707-dreamcatcher-freeradius2-fix-openssl-1.1.x-update.patch $OPENWRT_DIR/package/feeds/packages/freeradius2/patches/707-dreamcatcher-freeradius2-fix-openssl-1.1.x-update.patch
 
+# patch the iptables/xtables makefiles so it builds and includes the mdns module
+pushd $OPENWRT_DIR
+git apply $PATCH_DIR/mdns_makefiles.patch
+popd
+
 # weird download error -- can't find a particular version of the ca-certificates package on any mirror? Weird.
 # patch the Makefile to retrieve a ~5 day older version
-cp $CONFIG_DIR/ca-certificates_updated.Makefile $OPENWRT_DIR/package/system/ca-certificates/
+pushd $OPENWRT_DIR
+git apply $PATCH_DIR/ca-certificates_old_version.patch
+#cp $CONFIG_DIR/ca-certificates_updated.Makefile $OPENWRT_DIR/package/system/ca-certificates/
+popd
 
 
 
