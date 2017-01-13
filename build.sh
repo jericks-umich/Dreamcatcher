@@ -126,23 +126,6 @@ ln -s $DREAMCATCHER_DIR $OPENWRT_DIR/package/network/utils/dreamcatcher
 rm $OPENWRT_DIR/package/feeds/luci/luci-app-dreamcatcher 2>/dev/null
 ln -s $LUCI_APP_DREAMCATCHER_DIR $OPENWRT_DIR/package/feeds/luci/luci-app-dreamcatcher
 
-#### CONFIG ####
-# use our config file diff with everything we need in it
-# (Note: you can manually edit this configuration by cd'ing to the openwrt/
-#  directory and running 'make menuconfig')
-echo "Updating OpenWRT build config file..."
-rm $OPENWRT_DIR/.config 2>/dev/null
-pushd $OPENWRT_DIR
-make defconfig
-if [ "$VM" != "1" ] ; then
-	cat $CONFIG_DIR/development.diff >> $OPENWRT_DIR/.config
-else
-	cat $CONFIG_DIR/x86_vm.diff >> $OPENWRT_DIR/.config
-fi
-#cat $CONFIG_DIR/dreamcatcher.diff >> $OPENWRT_DIR/.config
-make defconfig
-popd
-
 #### PATCHES ####
 # add patches to openwrt
 echo "Linking patches to openwrt build..."
@@ -189,6 +172,25 @@ popd
 pushd $OPENWRT_DIR
 git apply $PATCH_DIR/ca-certificates_old_version.patch
 #cp $CONFIG_DIR/ca-certificates_updated.Makefile $OPENWRT_DIR/package/system/ca-certificates/
+popd
+
+
+
+#### CONFIG ####
+# use our config file diff with everything we need in it
+# (Note: you can manually edit this configuration by cd'ing to the openwrt/
+#  directory and running 'make menuconfig')
+echo "Updating OpenWRT build config file..."
+rm $OPENWRT_DIR/.config 2>/dev/null
+pushd $OPENWRT_DIR
+make defconfig
+if [ "$VM" != "1" ] ; then
+	cat $CONFIG_DIR/development.diff >> $OPENWRT_DIR/.config
+else
+	cat $CONFIG_DIR/x86_vm.diff >> $OPENWRT_DIR/.config
+fi
+#cat $CONFIG_DIR/dreamcatcher.diff >> $OPENWRT_DIR/.config
+make defconfig
 popd
 
 
