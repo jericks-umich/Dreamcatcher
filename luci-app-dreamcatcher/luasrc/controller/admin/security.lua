@@ -21,25 +21,37 @@ function index()
 end
 
 function unauth_rule()
-	local http_method = http.getenv("REQUEST_METHOD")
-	if http_method == "POST" then
-		local delete = http.formvalue("delete")
-		local accept = http.formvalue("accept")
-		local reject = http.formvalue("reject")
-		if delete ~= nil then
-			delete_rule()
-		elseif accept ~= nil then
-			accept_rule_general()
-		elseif reject ~= nil then
-			reject_rule_general()
-		end
-		http.redirect(luci.dispatcher.build_url("admin","security","unauth_rule"))
-	end
 	------------------------------------------------------------------------
 	-----------------------------hardcoded----------------------------------
 	vlan = '101'
 	------------------------------------------------------------------------
 	------------------------------------------------------------------------
+	local http_method = http.getenv("REQUEST_METHOD")
+	if http_method == "POST" then
+		local delete = http.formvalue("delete")
+		local accept = http.formvalue("accept")
+		local reject = http.formvalue("reject")
+		if delete ~= nil and accept == nil and reject == nil then
+			if (check_rule(delete,vlan)) then
+				delete_rule()
+			else
+				http.redirect(luci.dispatcher.build_url("admin","security","unauth_rule"))
+			end
+		elseif accept ~= nil and delete == nil and reject == nil then
+			if (check_rule(accept,vlan)) then
+				accept_rule_general()
+			else
+				http.redirect(luci.dispatcher.build_url("admin","security","unauth_rule"))
+			end
+		elseif reject ~= nil and accept == nil and delete == nil then
+			if (check_rule(reject,vlan)) then
+				reject_rule_general()
+			else
+				http.redirect(luci.dispatcher.build_url("admin","security","unauth_rule"))
+			end
+		end
+		http.redirect(luci.dispatcher.build_url("admin","security","unauth_rule"))
+	end
 	luci.template.render("admin_security/unauth_rule",{
 		permanent = unauth_perm_rule_table(vlan),
 		temp = unauth_temp_rule_table(vlan),
@@ -47,6 +59,16 @@ function unauth_rule()
 		nodes = GenerateNodes()
 	})
 end   
+
+-- Used to check whether rules' dst_vlan matches current vlan
+function check_rule(rule,vlan)
+	local x=luci.model.uci.cursor()
+	if (x:get("dreamcatcher",rule,"dst_vlan")==vlan) then
+		return true
+	else
+		return false
+	end
+end
 
 function Verdict_1()                                                                                              
         local http_method = http.getenv("REQUEST_METHOD")                                                         
