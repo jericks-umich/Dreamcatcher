@@ -45,23 +45,19 @@ unsigned int get_src_vlan(struct nfq_data *tb) {
 
 
 void handle_packet(struct nfq_data *tb) {
-    //int ret;
     
-    char * vlan = get_src_vlan(tb);
+    unsigned int vlan = get_src_vlan(tb);
+    char vlan_s[5];
     
-    //TODO: update filename
-    FILE * fp = fopen(const char * vlan.txt, 'w');
-    
-    //Busy wait until file is clean
-    char buff[5];
-    while(1){
-        fgets(buff, 5, (FILE*)fp);
-        if(buff[0] == '\0'){
-            break;
-        }
+    FILE * fp;
+    while(fp = fopen("/var/run/warden.vlan", "r")){
+        fclose(fp);
     }
+    fp = fopen("/var/run/warden.vlan", "w");
     
-    fputs(fp, vlan);
+    itoa(vlan, vlan_s, 10);
+    fputs(vlan_s, fp);
+    
     fclose(fp);
     
     return;
@@ -73,21 +69,22 @@ void handle_packet(struct nfq_data *tb) {
 int cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struct nfq_data *nfa, void *data)
 {
     LOGV("Got callback!");
-    // int ret;
-    // int id;
-    // u_int32_t verdict = NF_DROP;
+    int ret;
+    int id;
+    u_int32_t verdict = NF_ACCEPT;
     
-    /*struct nfqnl_msg_packet_hdr *ph = nfq_get_msg_packet_hdr(nfa);
-     if (ph) {
-     id = ntohl(ph->packet_id);
-     } else {
-     LOGW("Cannot parse packet. Not sure what to do!");
-     }*/
+    struct nfqnl_msg_packet_hdr *ph = nfq_get_msg_packet_hdr(nfa);
+    if (ph) {
+        id = ntohl(ph->packet_id);
+    } else {
+        LOGW("Cannot parse packet. Not sure what to do!");
+    }
     
     handle_packet(nfa);
     
-    
-    return 1;
+    ret = nfq_set_verdict(qh, id, verdict, 0, NULL);
+    return ret;
+}
 }
 
 
