@@ -1,0 +1,24 @@
+<%+header%>
+
+<h1><a id="title1" name="title1"><%:Add New Devices%></a></h1>
+For security, please add each device individually to the network. Each device will get its own password (the username is the device name you choose). Do not share these passwords with anyone or between devices. If you need to let a friend use your network, simply add their device here. If you replace a device, simply delete your old device from the list below and create a new one.
+<br><br>
+<form id="form" action="unauth_device" method="post">
+	Device name: <input type="text" name="device_name" id="dname"></input>
+	<input type="button" onclick="Reaction()" value="Submit"></input>
+</form>
+
+<%=TODO%>
+
+<script>
+function Reaction(){
+	document.getElementById("form").submit();
+	<%
+		require("uci")
+		local x=uci.cursor(nil,"/etc/config")
+		local proto=x:get("security","t1","src")
+	%>	
+}
+</script>
+
+<%+footer%>
