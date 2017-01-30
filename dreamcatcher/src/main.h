@@ -12,7 +12,7 @@
 #include <netinet/udp.h>
 #include <netinet/ip_icmp.h>
 
-#define QUEUE_NUM 4670
+#define QUEUE_NUM 4671
 
 
 void orig_print_pkt (struct nfq_data *tb);
