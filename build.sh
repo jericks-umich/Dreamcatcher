@@ -12,6 +12,7 @@ OPENWRT_DIR=$THIS_DIR/openwrt
 CONFIG_DIR=$THIS_DIR/config
 PATCH_DIR=$THIS_DIR/patches
 DREAMCATCHER_DIR=$THIS_DIR/dreamcatcher
+WARDEN_DIR=$THIS_DIR/warden
 LUCI_APP_DREAMCATCHER_DIR=$THIS_DIR/luci-app-dreamcatcher
 DEPS="git-core build-essential libssl-dev libncurses5-dev unzip gawk subversion quilt zlib1g-dev"
 XTABLES_DEPS="pkg-config libxtables-dev libxtables12 xtables-addons-common xtables-addons-dkms xtables-addons-source"
@@ -93,54 +94,40 @@ if [ "$SETUP" == "1" ] ; then
 	pushd $OPENWRT_DIR/feeds/targets
 	git checkout a977f6ab0f2f1cbdc8ee6bdca08ebc86980e4350
 	popd
-
-	# build feed indices (this was stolen and modified from scripts/feeds)
-	pushd $OPENWRT_DIR/
-	for feed in packages luci routing telephony management targets; do
-		mkdir -p "./feeds/$feed.tmp"
-		mkdir -p "./feeds/$feed.tmp/info"
-
-		export TOPDIR=$OPENWRT_DIR
-		make -s prepare-mk OPENWRT_BUILD= TMP_DIR="$OPENWRT_DIR/feeds/$feed.tmp"
-		make -s -f include/scan.mk IS_TTY=1 SCAN_TARGET="packageinfo" SCAN_DIR="feeds/$feed" SCAN_NAME="package" SCAN_DEPS="$OPENWRT_DIR/include/package*.mk" SCAN_DEPTH=5 SCAN_EXTRA="" TMP_DIR="$OPENWRT_DIR/feeds/$feed.tmp"
-		make -s -f include/scan.mk IS_TTY=1 SCAN_TARGET="targetinfo" SCAN_DIR="feeds/$feed" SCAN_NAME="target" SCAN_DEPS="profiles/*.mk $OPENWRT_DIR/include/target.mk" SCAN_DEPTH=5 SCAN_EXTRA="" SCAN_MAKEOPTS="TARGET_BUILD=1" TMP_DIR="$OPENWRT_DIR/feeds/$feed.tmp"
-		ln -sf $feed.tmp/.packageinfo ./feeds/$feed.index
-		ln -sf $feed.tmp/.targetinfo ./feeds/$feed.targetindex
-	done
-	popd
-
-	# install feeds
-	pushd $OPENWRT_DIR
-	./scripts/feeds install -a
-	popd
 fi
 
-# from here, run every time build.sh is called
 
 #### PACKAGES ####
 # add dreamcatcher package
 rm $OPENWRT_DIR/package/network/utils/dreamcatcher 2>/dev/null
 ln -s $DREAMCATCHER_DIR $OPENWRT_DIR/package/network/utils/dreamcatcher
 
+# add warden package
+rm $OPENWRT_DIR/package/network/utils/warden 2>/dev/null
+ln -s $WARDEN_DIR $OPENWRT_DIR/package/network/utils/warden
+
 # add luci-app-dreamcatcher package
 rm $OPENWRT_DIR/package/feeds/luci/luci-app-dreamcatcher 2>/dev/null
 ln -s $LUCI_APP_DREAMCATCHER_DIR $OPENWRT_DIR/package/feeds/luci/luci-app-dreamcatcher
 
-#### CONFIG ####
-# use our config file diff with everything we need in it
-# (Note: you can manually edit this configuration by cd'ing to the openwrt/
-#  directory and running 'make menuconfig')
-echo "Updating OpenWRT build config file..."
-rm $OPENWRT_DIR/.config 2>/dev/null
+# build feed indices (this was stolen and modified from scripts/feeds)
+pushd $OPENWRT_DIR/
+for feed in packages luci routing telephony management targets; do
+	mkdir -p "./feeds/$feed.tmp"
+	mkdir -p "./feeds/$feed.tmp/info"
+
+	export TOPDIR=$OPENWRT_DIR
+	make -s prepare-mk OPENWRT_BUILD= TMP_DIR="$OPENWRT_DIR/feeds/$feed.tmp"
+	make -s -f include/scan.mk IS_TTY=1 SCAN_TARGET="packageinfo" SCAN_DIR="feeds/$feed" SCAN_NAME="package" SCAN_DEPS="$OPENWRT_DIR/include/package*.mk" SCAN_DEPTH=5 SCAN_EXTRA="" TMP_DIR="$OPENWRT_DIR/feeds/$feed.tmp"
+	make -s -f include/scan.mk IS_TTY=1 SCAN_TARGET="targetinfo" SCAN_DIR="feeds/$feed" SCAN_NAME="target" SCAN_DEPS="profiles/*.mk $OPENWRT_DIR/include/target.mk" SCAN_DEPTH=5 SCAN_EXTRA="" SCAN_MAKEOPTS="TARGET_BUILD=1" TMP_DIR="$OPENWRT_DIR/feeds/$feed.tmp"
+	ln -sf $feed.tmp/.packageinfo ./feeds/$feed.index
+	ln -sf $feed.tmp/.targetinfo ./feeds/$feed.targetindex
+done
+popd
+
+# install feeds
 pushd $OPENWRT_DIR
-make defconfig
-if [ "$VM" != "1" ] ; then
-	cat $CONFIG_DIR/development.diff >> $OPENWRT_DIR/.config
-else
-	cat $CONFIG_DIR/x86_vm.diff >> $OPENWRT_DIR/.config
-fi
-#cat $CONFIG_DIR/dreamcatcher.diff >> $OPENWRT_DIR/.config
-make defconfig
+./scripts/feeds install -a
 popd
 
 #### PATCHES ####
@@ -189,6 +176,25 @@ popd
 pushd $OPENWRT_DIR
 git apply $PATCH_DIR/ca-certificates_old_version.patch
 #cp $CONFIG_DIR/ca-certificates_updated.Makefile $OPENWRT_DIR/package/system/ca-certificates/
+popd
+
+
+
+#### CONFIG ####
+# use our config file diff with everything we need in it
+# (Note: you can manually edit this configuration by cd'ing to the openwrt/
+#  directory and running 'make menuconfig')
+echo "Updating OpenWRT build config file..."
+rm $OPENWRT_DIR/.config 2>/dev/null
+pushd $OPENWRT_DIR
+make defconfig
+if [ "$VM" != "1" ] ; then
+	cat $CONFIG_DIR/development.diff >> $OPENWRT_DIR/.config
+else
+	cat $CONFIG_DIR/x86_vm.diff >> $OPENWRT_DIR/.config
+fi
+#cat $CONFIG_DIR/dreamcatcher.diff >> $OPENWRT_DIR/.config
+make defconfig
 popd
 
 

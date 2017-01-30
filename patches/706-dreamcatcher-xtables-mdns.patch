@@ -1,6 +1,6 @@
 --- /dev/null
 +++ b/extensions/libxt_mdns.c
-@@ -0,0 +1,148 @@
+@@ -0,0 +1,149 @@
 +/*
 + *  mDNS match extension for iptables
 + *  
@@ -31,12 +31,12 @@
 +static void mdns_mt_help(void) {
 +  printf(
 +      "mdns match options:\n"
-+      "  --type type               Either \"discovery\" or \"advertisement\"\n"
-+      "                            match mDNS packets of the specified type\n"
-+      "  --names name1.name2. ...  match mDNS advertisement packets with a\n"
-+      "                              subset of the specified names\n"
-+      "                              Note: '.' is used as a delimeter.\n"
-+      "                              Up to %d names are supported, %d chars each.\n"
++      "  --type type                         Either \"discovery\" or \"advertisement\"\n"
++      "                                      match mDNS packets of the specified type\n"
++      "  --names name1[.name2][.name3][...]  match mDNS advertisement packets with a\n"
++      "                                      subset of the specified names\n"
++      "                                      Note: '.' is used as a delimeter.\n"
++      "                                      Up to %d names are supported, %d chars each.\n"
 +      , XT_MDNS_MAX_NAMES, XT_MDNS_MAX_NAME_SIZE);
 +}
 +
@@ -81,6 +81,7 @@
 +    name = strtok(optarg, delim);
 +    for (int i=0; i<XT_MDNS_MAX_NAMES && name!=NULL; i++) {
 +      strncpy(info->names[i], name, XT_MDNS_MAX_NAME_SIZE);
++			name = strtok(NULL, delim);
 +    }
 +    return true;
 +  }

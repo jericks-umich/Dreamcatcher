@@ -46,52 +46,8 @@
 <pre>
 <%=permanent%>
 </pre>
-<h2><a id="title3" name="title3"><%:Add new rules%></a></h2>
-<form style="margin:0px" id="add" action="" method="post">
-	<table style="width:100%">
-	<tr>
-		<td>Source vlan</td>
-                <td>Destination vlan</td>                                                                                            
-                <td>Protocol</td>                                                                                                    
-                <td>Source IP</td>                                                                                                   
-		<td></td>
-	</tr>
-	<tr>
-		<td><input style="width:120px" type="text" name="src_vlan" id="src_vlan"></input></td>                             
-                <td><input style="width:120px" type="text" name="dst_vlan" id="dst_vlan"></input></td>                        
-                <td><input style="width:120px" type="text" name="proto" id="proto"></input></td>                                   
-                <td><input style="width:120px" type="text" name="src_ip" id="src_ip"></input></td> 
-	        <td><input type="button" onclick="add_perm_rule()" value="Add to perm rule"></td>                                                
-	</tr>
-	<tr>
-		<td>Destination IP</td>                                                                                              
-                <td>Source port</td>                                                                                                 
-                <td>Destination port</td>                                                                                            
-                <td>Verdict</td>                                                                                                     
-		<td></td>
-	</tr>
-	<tr>
-                <td><input style="width:120px" type="text" name="dst_ip" id="dst_ip"></input></td>    
-                <td><input style="width:120px" type="text" name="src_port" id="src_port"></input></td>     
-                <td><input style="width:120px" type="text" name="dst_port" id="dst_port"></input></td>
-                <td><input style="width:120px" type="text" name="verdict" id="verdict"></input></td>          
-		<td><input type="button" onclick="add_temp_rule()" value="Add to temp rule"></td>
-	</tr>
-	</table>
-	<input id="rule_type" type="hidden" name="rule_type" value="test"></input>
-</form>
 
 <script>
-function add_perm_rule(){
-	document.getElementById("rule_type").value="perm";                                                                           
-        document.getElementById("add").submit();                                                                                
-}    
-
-function add_temp_rule(){
-	document.getElementById("rule_type").value="temp";
-	document.getElementById("add").submit();
-}
-
 function modify_rule(IcName,method){
 //	if (method == 'accept' || method == 'reject'){
 //		r = confirm("Warning:\nAllowing/Blocking connections will Allow/Block ALL such connections. This may have security implications or may mean your devices will not work properly. Are you sure you want to do this? \n\nIf you would like more information and to selectively allow connections from, please use the Advanced tab.");
@@ -107,9 +63,6 @@ function modify_rule_2(IcName,method){
 	document.getElementById(IcName.concat(method)).submit();
 }
 
-function accept_all_rules(){                                     
-        document.getElementById("accept_all").submit();         
-} 
 </script>
 <meta charset="utf-8">
 <script src="http://d3js.org/d3.v3.js"></script>
