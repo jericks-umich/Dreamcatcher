@@ -56,7 +56,7 @@ void handle_packet(struct nfq_data *tb) {
     }
     fp = fopen("/var/run/warden.vlan", "w");
     
-    itoa(vlan, vlan_s, 10);
+    snprintf(vlan_s, 5, "%d", vlan);
     fputs(vlan_s, fp);
     
     fclose(fp);
@@ -86,7 +86,7 @@ int cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struct nfq_data *nfa, vo
     ret = nfq_set_verdict(qh, id, verdict, 0, NULL);
     return ret;
 }
-}
+
 
 
 int main(int argc, char **argv)
