@@ -52,6 +52,7 @@ void handle_packet(struct nfq_data *tb) {
     FILE * fp;
     while(fp = fopen("/var/run/warden.vlan", "r")){
         fclose(fp);
+        sleep(1);
     }
     fp = fopen("/var/run/warden.vlan", "w");
     
