@@ -1,0 +1,244 @@
+--- a/dreamcatcher.c
++++ b/dreamcatcher.c
+@@ -2,15 +2,16 @@
+ 
+ const struct fw3_option fw3_dreamcatcher_rule_opts[] = {
+   //FW3_OPT("name",                string,    rule,     name),
+-  FW3_OPT("type",                int,       dreamcatcher_rule,     type),
+-  FW3_OPT("src_vlan",            vlan,      dreamcatcher_rule,     src_vlan),
+-  FW3_OPT("dst_vlan",            vlan,      dreamcatcher_rule,     dst_vlan),
+-  FW3_OPT("proto",               protocol,  dreamcatcher_rule,     proto),
+-  FW3_OPT("src_ip",              address,   dreamcatcher_rule,     ip_src),
+-  FW3_OPT("dst_ip",              address,   dreamcatcher_rule,     ip_dst),
+-  FW3_OPT("src_port",            port,      dreamcatcher_rule,     port_src),
+-  FW3_OPT("dst_port",            port,      dreamcatcher_rule,     port_dst),
+-  FW3_OPT("verdict",             target,    dreamcatcher_rule,     target),
++  FW3_OPT("type",                int,         dreamcatcher_rule,     type),
++  FW3_OPT("src_vlan",            vlan,        dreamcatcher_rule,     src_vlan),
++  FW3_OPT("dst_vlan",            vlan,        dreamcatcher_rule,     dst_vlan),
++  FW3_OPT("proto",               protocol,    dreamcatcher_rule,     proto),
++  FW3_OPT("src_ip",              address,     dreamcatcher_rule,     ip_src),
++  FW3_OPT("dst_ip",              address,     dreamcatcher_rule,     ip_dst),
++  FW3_OPT("src_port",            port,        dreamcatcher_rule,     port_src),
++  FW3_OPT("dst_port",            port,        dreamcatcher_rule,     port_dst),
++  FW3_LIST("device_name",        device_name, dreamcatcher_rule,     device_name),
++  FW3_OPT("verdict",             target,      dreamcatcher_rule,     target),
+ 
+   { }
+ };
+@@ -67,6 +68,8 @@ void fw3_load_dreamcatcher_rules(struct
+     if (!rule) {
+       continue;
+     }
++		INIT_LIST_HEAD(&rule->device_name); // initialize list of device names (they will be added to linked list in parse_options()
++
+ 		list_add_tail(&rule->list, &state->dreamcatcher_rules); // add rule to list of dreamcatcher rules
+ 
+     fw3_parse_options(rule, fw3_dreamcatcher_rule_opts, s); // parse the config file and put options in proper places
+@@ -100,7 +103,8 @@ static void dreamcatcher_print_rule(stru
+ 
+   info("   * Dreamcatcher Rule #%u", num);
+ 
+-  // need to create one new rule per permutation of devices (1 radio = 1 rule. 2 radios = 2-4 rules, 3 radios = 3-9 rules, and so on)
++	// all rule types have just src_vlan, except for UNICAST (type 0), which has a dst_vlan too
++  // in that case, we need to create one new rule per permutation of devices (1 radio = 1 rule. 2 radios = 2-4 rules, 3 radios = 3-9 rules, and so on)
+   // example: lets say we have a rule blocking vlan 11 from 12, and wireless radios wlan0, wlan1, and wlan2 (strange to have 3 radios, but w/e)
+   // wlan0.11 --block-> wlan0.12
+   // wlan0.11 --block-> wlan1.12
+@@ -134,13 +138,21 @@ static void dreamcatcher_print_rule(stru
+             warn("   * Dreamcatcher unsupported rule target %d", rule->target);
+             return;
+         }
+-        switch (rule->type) { // 0 == UNICAST, 1 == BROADCAST, other == error
++        switch (rule->type) { // 0 == UNICAST, 1 == BROADCAST, 2 == DISCOVERY, 3 == ADVERTISEMENT, other == error
+           case 0:
+-            fw3_ipt_rule_append(r, "DC_UNICAST_lan_rule");
++						warn("Should never have a UNICAST rule without dst_vlan");
++            //fw3_ipt_rule_append(r, "DC_UNICAST_lan_rule");
+             break;
+           case 1:
+             fw3_ipt_rule_append(r, "DC_BROADCAST_lan_rule");
+             break;
++					case 2:
++						fw3_ipt_rule_discovery(r);
++            fw3_ipt_rule_append(r, "DC_MDNS_lan_rule");
++					case 3:
++						fw3_ipt_rule_advertisement(r, (struct fw3_device_name*)&rule->device_name);
++            fw3_ipt_rule_append(r, "DC_MDNS_lan_rule");
++						break;
+           default:
+             warn("   * Dreamcatcher unsupported rule type %d", rule->type);
+         }
+@@ -150,7 +162,7 @@ static void dreamcatcher_print_rule(stru
+         fw3_foreach(dst_int_prefix, &d_info->interface_prefix) {
+           r = fw3_ipt_rule_create(handle, &rule->proto, NULL, NULL, &rule->ip_src, &rule->ip_dst);
+           fw3_ipt_rule_sport_dport(r, &rule->port_src, &rule->port_dst);
+-          fw3_ipt_rule_sdvlan(r, src_int_prefix->name, rule->src_vlan, rule->dst_vlan);
++          fw3_ipt_rule_sdvlan(r, src_int_prefix->name, dst_int_prefix->name, rule->src_vlan, rule->dst_vlan);
+           switch (rule->target) {
+             case FW3_FLAG_ACCEPT:
+               fw3_ipt_rule_target(r, "ACCEPT");
+@@ -170,8 +182,16 @@ static void dreamcatcher_print_rule(stru
+               fw3_ipt_rule_append(r, "DC_UNICAST_lan_rule");
+               break;
+             case 1:
+-              fw3_ipt_rule_append(r, "DC_BROADCAST_lan_rule");
++							warn("Should never have a BROADCAST rule with dst_vlan");
++              //fw3_ipt_rule_append(r, "DC_BROADCAST_lan_rule");
+               break;
++						case 2:
++							warn("Should never have a DISCOVERY rule with dst_vlan");
++							//fw3_ipt_rule_append(r, "DC_MDNS_lan_rule");
++						case 3:
++							warn("Should never have a ADVERTISEMENT rule with dst_vlan");
++							//fw3_ipt_rule_append(r, "DC_MDNS_lan_rule");
++							break;
+             default:
+               warn("   * Dreamcatcher unsupported rule type %d", rule->type);
+           }
+@@ -191,8 +211,10 @@ void fw3_print_dreamcatcher_rules(struct
+ }
+ 
+ void fw3_flush_dreamcatcher(struct fw3_ipt_handle *handle) {
++  char chain0[32] = "DC_MDNS_lan_rule";
+   char chain1[32] = "DC_UNICAST_lan_rule";
+   char chain2[32] = "DC_BROADCAST_lan_rule";
++  fw3_ipt_flush_chain(handle, chain0);
+   fw3_ipt_flush_chain(handle, chain1);
+   fw3_ipt_flush_chain(handle, chain2);
+ }
+--- a/iptables.c
++++ b/iptables.c
+@@ -838,17 +838,37 @@ fw3_ipt_rule_svlan(struct fw3_ipt_rule *
+ }
+ 
+ void
+-fw3_ipt_rule_sdvlan(struct fw3_ipt_rule *r, const char* interface_prefix, int svlan, int dvlan)
++fw3_ipt_rule_sdvlan(struct fw3_ipt_rule *r, const char* src_interface_prefix, const char* dst_interface_prefix, int svlan, int dvlan)
+ {
+   char buf[16];
+   fw3_ipt_rule_addarg(r, false, "-m", "physdev");
+-  snprintf(buf, 16, "%s.%d", interface_prefix, svlan);
++  snprintf(buf, 16, "%s.%d", src_interface_prefix, svlan);
+   fw3_ipt_rule_addarg(r, false, "--physdev-in", buf);
+-  snprintf(buf, 16, "%s.%d", interface_prefix, dvlan);
++  snprintf(buf, 16, "%s.%d", dst_interface_prefix, dvlan);
+   fw3_ipt_rule_addarg(r, false, "--physdev-out", buf);
+ }
+ 
+ void
++fw3_ipt_rule_discovery(struct fw3_ipt_rule *r)
++{
++	fw3_ipt_rule_addarg(r, false, "-m", "mdns");
++	fw3_ipt_rule_addarg(r, false, "-type", "discovery");
++}
++
++void
++fw3_ipt_rule_advertisement(struct fw3_ipt_rule *r, struct fw3_device_name *dn)
++{
++	char buf[2048];
++	struct fw3_device_name* ptr;
++	fw3_ipt_rule_addarg(r, false, "-m", "mdns");
++	fw3_ipt_rule_addarg(r, false, "-type", "advertisement");
++	fw3_foreach(ptr, (struct list_head*) dn) {
++		snprintf(buf, sizeof(buf), "%s.%s", buf, ptr->device_name);
++	} // this will make the string start with a '.', so we'll skip that when we write out the list of names
++	fw3_ipt_rule_addarg(r, false, "--names", &(buf[1]));
++}
++
++void
+ fw3_ipt_rule_sport_dport(struct fw3_ipt_rule *r,
+                          struct fw3_port *sp, struct fw3_port *dp)
+ {
+--- a/zones.c
++++ b/zones.c
+@@ -48,6 +48,7 @@ static const struct fw3_chain_spec zone_
+ 	C(V4,  NAT,    CUSTOM_CHAINS, "prerouting_%s_rule"),
+ 	C(V4,  NAT,    CUSTOM_CHAINS, "postrouting_%s_rule"),
+ 
++	C(ANY, FILTER, DREAMCATCHER,  "DC_MDNS_%s_rule"),
+ 	C(ANY, FILTER, DREAMCATCHER,  "DC_UNICAST_%s_rule"),
+ 	C(ANY, FILTER, DREAMCATCHER,  "DC_BROADCAST_%s_rule"),
+ 
+@@ -503,12 +504,19 @@ print_zone_rule(struct fw3_ipt_handle *h
+ 		// these should go here specifically, after all the other firewall forwarding rules but before the default rule
+ 		if (has(zone->flags, handle->family, FW3_FLAG_DREAMCATCHER))
+ 		{
+-      // First rule sends mDNS packets straight to NFQUEUE, skipping the DREAMCATCHER_lan_rule chain
+-      r = fw3_ipt_rule_new(handle);
+       struct fw3_protocol udp;
+       struct fw3_port mdns;
+       fw3_parse_protocol(&udp, "udp", false); // create udp protocol object
+       fw3_parse_port(&mdns, "5353", false); // create port 5353 object
++			// DC_MDNS_lan_rule chain
++      r = fw3_ipt_rule_new(handle);
++      fw3_ipt_rule_proto(r, &udp);
++      fw3_ipt_rule_sport_dport(r, NULL, &mdns);
++      fw3_ipt_rule_comment(r,"DREAMCATCHER MDNS chain");
++			fw3_ipt_rule_target(r, "DC_MDNS_%s_rule", zone->name);
++      fw3_ipt_rule_append(r, "zone_%s_forward", zone->name);
++      // First rule sends mDNS packets straight to NFQUEUE, skipping the DREAMCATCHER_lan_rule chain
++      r = fw3_ipt_rule_new(handle);
+       fw3_ipt_rule_proto(r, &udp);
+       fw3_ipt_rule_sport_dport(r, NULL, &mdns);
+       fw3_ipt_rule_comment(r,"mDNS -> NFQUEUE");
+--- a/options.h
++++ b/options.h
+@@ -385,10 +385,17 @@ struct fw3_dreamcatcher_rule
+ 	struct fw3_address ip_dst;
+ 	struct fw3_port port_src;
+ 	struct fw3_port port_dst;
++	struct list_head device_name;
+ 	enum fw3_flag target;
+   // default option approved 0
+ };
+ 
++struct fw3_device_name
++{
++	struct list_head list;
++	const char* device_name;
++};
++
+ struct fw3_dreamcatcher_info
+ {
+   struct list_head list;
+@@ -598,6 +605,7 @@ bool fw3_parse_monthdays(void *ptr, cons
+ bool fw3_parse_mark(void *ptr, const char *val, bool is_list);
+ bool fw3_parse_setmatch(void *ptr, const char *val, bool is_list);
+ bool fw3_parse_direction(void *ptr, const char *val, bool is_list);
++bool fw3_parse_device_name(void *ptr, const char *val, bool is_list);
+ 
+ bool fw3_parse_options(void *s, const struct fw3_option *opts,
+                        struct uci_section *section);
+--- a/iptables.h
++++ b/iptables.h
+@@ -114,7 +114,11 @@ void fw3_ipt_rule_src_dest(struct fw3_ip
+ 
+ void fw3_ipt_rule_svlan(struct fw3_ipt_rule *r, const char* interface_prefix, int svlan);
+ 
+-void fw3_ipt_rule_sdvlan(struct fw3_ipt_rule *r, const char* interface_prefix, int svlan, int dvlan);
++void fw3_ipt_rule_sdvlan(struct fw3_ipt_rule *r, const char* src_interface_prefix, const char* dst_interface_prefix, int svlan, int dvlan);
++
++void fw3_ipt_rule_discovery(struct fw3_ipt_rule *r);
++
++void fw3_ipt_rule_advertisement(struct fw3_ipt_rule *r, struct fw3_device_name *dn);
+ 
+ void fw3_ipt_rule_sport_dport(struct fw3_ipt_rule *r,
+                               struct fw3_port *sp, struct fw3_port *dp);
+--- a/options.c
++++ b/options.c
+@@ -913,6 +913,14 @@ fw3_parse_direction(void *ptr, const cha
+ 	return valid;
+ }
+ 
++bool 
++fw3_parse_device_name(void *ptr, const char *val, bool is_list)
++{
++  struct fw3_device_name dn = { };
++  dn.device_name = strdup(val);
++	put_value(ptr, &dn, sizeof(dn), is_list);
++  return true;
++}
+ 
+ bool
+ fw3_parse_options(void *s, const struct fw3_option *opts,
