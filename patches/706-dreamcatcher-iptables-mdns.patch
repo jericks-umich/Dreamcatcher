@@ -37,7 +37,7 @@
 +#endif // DNS_H
 --- /dev/null
 +++ b/extensions/libxt_mdns.c
-@@ -0,0 +1,148 @@
+@@ -0,0 +1,149 @@
 +/*
 + *  mDNS match extension for iptables
 + *  
@@ -118,6 +118,7 @@
 +    name = strtok(optarg, delim);
 +    for (int i=0; i<XT_MDNS_MAX_NAMES && name!=NULL; i++) {
 +      strncpy(info->names[i], name, XT_MDNS_MAX_NAME_SIZE);
++			name = strtok(NULL, delim);
 +    }
 +    return true;
 +  }
