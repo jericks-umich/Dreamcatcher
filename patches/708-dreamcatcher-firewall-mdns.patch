@@ -130,16 +130,16 @@
 +fw3_ipt_rule_discovery(struct fw3_ipt_rule *r)
 +{
 +	fw3_ipt_rule_addarg(r, false, "-m", "mdns");
-+	fw3_ipt_rule_addarg(r, false, "-type", "discovery");
++	fw3_ipt_rule_addarg(r, false, "--type", "discovery");
 +}
 +
 +void
 +fw3_ipt_rule_advertisement(struct fw3_ipt_rule *r, struct fw3_device_name *dn)
 +{
-+	char buf[2048];
++	char buf[2048] = "\0";
 +	struct fw3_device_name* ptr;
 +	fw3_ipt_rule_addarg(r, false, "-m", "mdns");
-+	fw3_ipt_rule_addarg(r, false, "-type", "advertisement");
++	fw3_ipt_rule_addarg(r, false, "--type", "advertisement");
 +	fw3_foreach(ptr, (struct list_head*) dn) {
 +		snprintf(buf, sizeof(buf), "%s.%s", buf, ptr->device_name);
 +	} // this will make the string start with a '.', so we'll skip that when we write out the list of names
