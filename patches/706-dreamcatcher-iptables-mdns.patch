@@ -101,7 +101,7 @@
 +  switch (c) {
 +
 +  case 't': // type
-+    if (strncmp("discovery", optarg, 8) == 0) { // if this is a discover type
++    if (strncmp("discovery", optarg, 9) == 0) { // if this is a discover type
 +      info->type = XT_MDNS_TYPE_DISCOVERY;
 +    } else if (strncmp("advertisement", optarg, 13) == 0) { // if this is an advertisement type
 +      info->type = XT_MDNS_TYPE_ADVERTISEMENT;
@@ -137,12 +137,12 @@
 +    printf(" --type discovery");
 +  } else { // type == XT_MDNS_TYPE_ADVERTISEMENT
 +    printf(" --type advertisement");
-+    printf(" --names %s", info->names[0]);
++    printf(" --names \"%s", info->names[0]);
 +    for (int i=1; *info->names[i] != '\0'; i++) {
 +      printf(".%s",info->names[i]);
 +    }
++		printf("\"");
 +  }
-+  printf(" ");
 +}
 +
 +
