@@ -13,10 +13,15 @@
 #include <netinet/ip_icmp.h>
 
 #define QUEUE_NUM 4671
+#define QUEUE_NUM2 4672
 
 unsigned int get_src_vlan(struct nfq_data *tb);
 void handle_packet(struct nfq_data *tb);
+void handle_packet2(struct nfq_data *tb);
 int cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struct nfq_data *nfa, void *data);
+int cb2(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struct nfq_data *nfa, void *data);
+void parentFunc();
+void parentFunc2();
 int main(int argc, char **argv);
 
 
