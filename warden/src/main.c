@@ -127,7 +127,7 @@ int cb2(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struct nfq_data *nfa, v
     return ret;
 }
 
-void parentFunc(){
+void * parentFunc(void *arg){
 
     struct nfq_handle *h;
     struct nfq_q_handle *qh;
@@ -182,7 +182,7 @@ void parentFunc(){
 
 }
 
-void parentFunc2(){
+void *parentFunc2(void * arg){
 
     struct nfq_handle *h;
     struct nfq_q_handle *qh;

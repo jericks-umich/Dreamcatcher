@@ -20,8 +20,8 @@ void handle_packet(struct nfq_data *tb);
 void handle_packet2(struct nfq_data *tb);
 int cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struct nfq_data *nfa, void *data);
 int cb2(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struct nfq_data *nfa, void *data);
-void parentFunc();
-void parentFunc2();
+void * parentFunc(void *arg);
+void * parentFunc2(void *arg);
 int main(int argc, char **argv);
 
 
