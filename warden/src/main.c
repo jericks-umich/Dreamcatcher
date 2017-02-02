@@ -243,6 +243,9 @@ int main(int argc, char **argv)
     pthread_t th1, th2;
     pthread_create(&th1, NULL, parentFunc, "");
     pthread_create(&th2, NULL, parentFunc2, "");
+
+    pthread_join(th1, NULL);
+    pthread_join(th2, NULL);
     
     exit(0);
 }
