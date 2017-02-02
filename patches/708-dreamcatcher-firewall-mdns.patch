@@ -45,7 +45,7 @@
    // example: lets say we have a rule blocking vlan 11 from 12, and wireless radios wlan0, wlan1, and wlan2 (strange to have 3 radios, but w/e)
    // wlan0.11 --block-> wlan0.12
    // wlan0.11 --block-> wlan1.12
-@@ -134,13 +138,21 @@ static void dreamcatcher_print_rule(stru
+@@ -134,13 +138,22 @@ static void dreamcatcher_print_rule(stru
              warn("   * Dreamcatcher unsupported rule target %d", rule->target);
              return;
          }
@@ -62,6 +62,7 @@
 +					case 2:
 +						fw3_ipt_rule_discovery(r);
 +            fw3_ipt_rule_append(r, "DC_MDNS_lan_rule");
++						break;
 +					case 3:
 +						fw3_ipt_rule_advertisement(r, (struct fw3_device_name*)&rule->device_name);
 +            fw3_ipt_rule_append(r, "DC_MDNS_lan_rule");
@@ -69,7 +70,7 @@
            default:
              warn("   * Dreamcatcher unsupported rule type %d", rule->type);
          }
-@@ -150,7 +162,7 @@ static void dreamcatcher_print_rule(stru
+@@ -150,7 +163,7 @@ static void dreamcatcher_print_rule(stru
          fw3_foreach(dst_int_prefix, &d_info->interface_prefix) {
            r = fw3_ipt_rule_create(handle, &rule->proto, NULL, NULL, &rule->ip_src, &rule->ip_dst);
            fw3_ipt_rule_sport_dport(r, &rule->port_src, &rule->port_dst);
@@ -78,7 +79,7 @@
            switch (rule->target) {
              case FW3_FLAG_ACCEPT:
                fw3_ipt_rule_target(r, "ACCEPT");
-@@ -170,8 +182,16 @@ static void dreamcatcher_print_rule(stru
+@@ -170,8 +183,17 @@ static void dreamcatcher_print_rule(stru
                fw3_ipt_rule_append(r, "DC_UNICAST_lan_rule");
                break;
              case 1:
@@ -89,6 +90,7 @@
 +						case 2:
 +							warn("Should never have a DISCOVERY rule with dst_vlan");
 +							//fw3_ipt_rule_append(r, "DC_MDNS_lan_rule");
++							break;
 +						case 3:
 +							warn("Should never have a ADVERTISEMENT rule with dst_vlan");
 +							//fw3_ipt_rule_append(r, "DC_MDNS_lan_rule");
@@ -96,7 +98,7 @@
              default:
                warn("   * Dreamcatcher unsupported rule type %d", rule->type);
            }
-@@ -191,8 +211,10 @@ void fw3_print_dreamcatcher_rules(struct
+@@ -191,8 +213,10 @@ void fw3_print_dreamcatcher_rules(struct
  }
  
  void fw3_flush_dreamcatcher(struct fw3_ipt_handle *handle) {
@@ -130,16 +132,16 @@
 +fw3_ipt_rule_discovery(struct fw3_ipt_rule *r)
 +{
 +	fw3_ipt_rule_addarg(r, false, "-m", "mdns");
-+	fw3_ipt_rule_addarg(r, false, "-type", "discovery");
++	fw3_ipt_rule_addarg(r, false, "--type", "discovery");
 +}
 +
 +void
 +fw3_ipt_rule_advertisement(struct fw3_ipt_rule *r, struct fw3_device_name *dn)
 +{
-+	char buf[2048];
++	char buf[2048] = "\0";
 +	struct fw3_device_name* ptr;
 +	fw3_ipt_rule_addarg(r, false, "-m", "mdns");
-+	fw3_ipt_rule_addarg(r, false, "-type", "advertisement");
++	fw3_ipt_rule_addarg(r, false, "--type", "advertisement");
 +	fw3_foreach(ptr, (struct list_head*) dn) {
 +		snprintf(buf, sizeof(buf), "%s.%s", buf, ptr->device_name);
 +	} // this will make the string start with a '.', so we'll skip that when we write out the list of names
