@@ -48,6 +48,10 @@ if [ "$SETUP" == "1" ] ; then
 	# get latest openwrt
 	echo "Retrieving and updating OpenWRT repository."
 	git submodule update --init --recursive
+	# weird bug fix needed
+	pushd $OPENWRT_DIR
+	git checkout master
+	popd
 
 	# update feeds (packages, etc.)
 	echo "Updating OpenWRT modules"
