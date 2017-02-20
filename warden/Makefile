@@ -15,7 +15,7 @@ define Package/warden
 	CATEGORY:=Network
 	SUBMENU:=Firewall
 	TITLE:=Warden - authentication module
-	DEPENDS:=+wpad +libnetfilter-queue +iptables-mod-nfqueue +kmod-ipt-nfqueue +iptables-mod-extra +kmod_ipt-extra +kmod-nfnetlink +kmod-nfnetlink-queue +libuci +freeradius2 +FREERADIUS_OPENSSL +freeradius2-common +freeradius2-mod-chap +freeradius2-mod-detail +freeradius2-mod-eap +freeradius2-mod-eap-mschapv2 +freeradius2-mod-eap-peap +freeradius2-mod-eap-tls +freeradius2-mod-eap-ttls +freeradius2-mod-exec +freeradius2-mod-files +freeradius2-mod-mschap +freeradius2-mod-pap +freeradius2-mod-passwd +freeradius2-mod-preprocess +freeradius2-mod-radutmp +freeradius2-utils +libopenssl +libcurl +libxtables +kmod-ipt-compat-xtables
+	DEPENDS:=+libjson-c +wpad +libnetfilter-queue +iptables-mod-nfqueue +kmod-ipt-nfqueue +iptables-mod-extra +kmod_ipt-extra +kmod-nfnetlink +kmod-nfnetlink-queue +libuci +freeradius2 +FREERADIUS_OPENSSL +freeradius2-common +freeradius2-mod-chap +freeradius2-mod-detail +freeradius2-mod-eap +freeradius2-mod-eap-mschapv2 +freeradius2-mod-eap-peap +freeradius2-mod-eap-tls +freeradius2-mod-eap-ttls +freeradius2-mod-exec +freeradius2-mod-files +freeradius2-mod-mschap +freeradius2-mod-pap +freeradius2-mod-passwd +freeradius2-mod-preprocess +freeradius2-mod-radutmp +freeradius2-utils +libopenssl +libcurl +libxtables +kmod-ipt-compat-xtables
 endef
 
 define Package/warden/description
@@ -27,7 +27,7 @@ define Build/Prepare
 	$(CP) ./src/* $(PKG_BUILD_DIR)
 endef
 
-LDFLAGS += -Wl,-rpath-link=$(STAGING_DIR)/usr/lib -lnetfilter_queue -luci -lnfnetlink -lpthread -lssl -lcrypto -lcurl
+LDFLAGS += -Wl,-rpath-link=$(STAGING_DIR)/usr/lib -lnetfilter_queue -luci -lnfnetlink -lpthread -lssl -lcrypto -lcurl -ljson-c
 
 define Build/Compile
 	$(TARGET_CC) $(TARGET_CFLAGS) $(LDFLAGS) -I$(PKG_BUILD_DIR) -o $(PKG_BUILD_DIR)/warden \

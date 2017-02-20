@@ -85,3 +85,4 @@ CONFIG_PACKAGE_iptables-mod-mdns=y
 CONFIG_PACKAGE_kmod-ipt-mdns=y
 CONFIG_PACKAGE_kmod-ipt-compat-xtables=y
 CONFIG_PACKAGE_warden=y
+CONFIG_PACKAGE_libjson-c=y
