@@ -106,10 +106,6 @@ ln -s $DREAMCATCHER_DIR $OPENWRT_DIR/package/network/utils/dreamcatcher
 rm $OPENWRT_DIR/package/network/utils/warden 2>/dev/null
 ln -s $WARDEN_DIR $OPENWRT_DIR/package/network/utils/warden
 
-# add luci-app-dreamcatcher package
-rm $OPENWRT_DIR/package/feeds/luci/luci-app-dreamcatcher 2>/dev/null
-ln -s $LUCI_APP_DREAMCATCHER_DIR $OPENWRT_DIR/package/feeds/luci/luci-app-dreamcatcher
-
 # build feed indices (this was stolen and modified from scripts/feeds)
 pushd $OPENWRT_DIR/
 for feed in packages luci routing telephony management targets; do
@@ -129,6 +125,11 @@ popd
 pushd $OPENWRT_DIR
 ./scripts/feeds install -a
 popd
+
+# add luci-app-dreamcatcher package
+rm $OPENWRT_DIR/package/feeds/luci/luci-app-dreamcatcher 2>/dev/null
+ln -s $LUCI_APP_DREAMCATCHER_DIR $OPENWRT_DIR/package/feeds/luci/luci-app-dreamcatcher
+
 
 #### PATCHES ####
 # add patches to openwrt
