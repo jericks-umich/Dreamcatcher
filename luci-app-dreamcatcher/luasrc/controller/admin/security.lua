@@ -23,7 +23,13 @@ end
 function unauth_rule()
 	------------------------------------------------------------------------
 	-----------------------------hardcoded----------------------------------
-	vlan = '101'
+	local vlan = ""
+	local file = io.open("/var/run/warden.vlan","r")
+	for line in file:lines() do
+		vlan = line
+	end
+	file:close()
+	os.remove("/var/run/warden.vlan")
 	------------------------------------------------------------------------
 	------------------------------------------------------------------------
 	local http_method = http.getenv("REQUEST_METHOD")
@@ -388,7 +394,6 @@ function unauth_temp_rule_table(vlan)
 		local IcName = s[".name"]
 		local approved = x:get("dreamcatcher",IcName,"approved")
 		if approved == "0" then
-			flag = true
 			temp_table = temp_table .. "<tr>\n"
 			local src_device = ""
 			local dst_device = ""
@@ -396,6 +401,7 @@ function unauth_temp_rule_table(vlan)
                         local src_vlan = x:get("dreamcatcher",IcName,"src_vlan")
 			local dst_vlan = x:get("dreamcatcher",IcName,"dst_vlan")
 			if dst_vlan == vlan then
+				flag = true
 				if src_vlan == nil then
 					src_device = "Unknown device"
 				else
