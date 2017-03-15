@@ -32,6 +32,8 @@ CONFIG_PACKAGE_freeradius2-utils=y
 CONFIG_PACKAGE_hostapd=y
 CONFIG_PACKAGE_iptables-mod-extra=y
 CONFIG_PACKAGE_iptables-mod-nfqueue=y
+CONFIG_PACKAGE_arptables=y
+CONFIG_PACKAGE_kmod-arptables=y
 CONFIG_PACKAGE_kmod-ebtables=y
 CONFIG_PACKAGE_kmod-ipt-extra=y
 CONFIG_PACKAGE_kmod-ipt-nfqueue=y
@@ -86,6 +88,4 @@ CONFIG_PACKAGE_kmod-ipt-mdns=y
 CONFIG_PACKAGE_kmod-ipt-compat-xtables=y
 CONFIG_PACKAGE_warden=y
 CONFIG_PACKAGE_libjson-c=y
-CONFIG_PACKAGE_kmod-arptables
-CONFIG_PACKAGE_arptables
 
