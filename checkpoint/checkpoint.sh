@@ -28,7 +28,7 @@ ebtables -A FORWARD -p arp -j arp_checkpoint
 ebtables -A arp_checkpoint --mark ! $ARP_MARK -p arp --log --log-prefix ARP_CHECKPOINT --log-arp -j CONTINUE # default rule to log anything that isn't caught beforehand
 ebtables -I arp_checkpoint -p arp --arp-ip-src 192.168.1.1 -j DROP # default rule to prevent router's ip from being stolen
 ebtables --new-chain mac_checkpoint -P RETURN
-# we're blocking packets with dest_mac and output interface so no need/way to use INPUT chain here
+ebtables -I INPUT -j mac_checkpoint
 ebtables -I FORWARD -j mac_checkpoint
 ebtables -A mac_checkpoint --mark ! $MAC_MARK --log --log-prefix MAC_CHECKPOINT -j CONTINUE # default rule to log anything that isn't caught beforehand
 
@@ -48,8 +48,8 @@ declare -A arp_mapping # create "state" associative array
 declare -A mac_mapping # create "state" associative array
 # keys will be mac addresses, values will be the interface names
 # Example:
-# arp_mapping["00:11:22:33:44:55"] = "wlan0.101"
-# arp_mapping["aa:bb:cc:dd:ee:ff"] = "wlan0.100"
+# mac_mapping["00:11:22:33:44:55"] = "wlan0.101"
+# mac_mapping["aa:bb:cc:dd:ee:ff"] = "wlan0.100"
 
 declare arp_new # create queue of New-state IPs
 declare arp_expiring # create queue of Expiring-state IPs
@@ -108,9 +108,8 @@ function arp_make_new {
 }
 
 function mac_make_new {
-	arg=$1
-	iface=${arg[0]}
-	mac=${arg[1]}
+	iface=$1
+	mac=$2
 	echo "New mac: $mac -> $iface"
 
 	# check if we have this mapping already
@@ -127,11 +126,11 @@ function mac_make_new {
 					mac_new+=("$SECONDS $mac") # refreshed entry into new queue
 					j=$(expr $i + 1)
 					mac_expiring=("${mac_expiring[@]:0:$i}" "${mac_expiring[@]:$j}") # slice/concat expiring queue to remove element
-					ebtables -I mac_checkpoint -o $iface -d $mac -j mark --mark-set $MAC_MARK --mark-target CONTINUE
+					ebtables -I mac_checkpoint -i $iface -s $mac -j mark --mark-set $MAC_MARK --mark-target CONTINUE
 					echo "Refreshed mac expired -> new"
 				else # if the mapping is different, AHHHHHHHH!!!!!
 					echo "ERROR: mac mapping is different!"
-					old_iface=${arp_mapping["$ip"]}
+					old_iface=${mac_mapping["$mac"]}
 					echo "Existing mapping: $mac -> $old_iface"
 					echo "New mapping: $mac -> $iface"
 					# do not refresh mapping
@@ -145,8 +144,8 @@ function mac_make_new {
 		mac_mapping["$mac"]="$iface"
 		mac_new+=("$SECONDS $mac")
 		# add new ebtables rules
-		ebtables -I mac_checkpoint -o ! $iface -d $mac -j DROP
-		ebtables -I mac_checkpoint -o $iface -d $mac -j mark --mark-set $MAC_MARK --mark-target CONTINUE
+		ebtables -I mac_checkpoint -i ! $iface -s $mac -j DROP
+		ebtables -I mac_checkpoint -i $iface -s $mac -j mark --mark-set $MAC_MARK --mark-target CONTINUE
 	fi
 }
 
@@ -186,7 +185,7 @@ function mac_check_timers {
 		fi
 		echo "Expiring mac entry for $2 expired"
 		# if this entry is expired, remove "drop" rule, remove mapping, shift expiring array to remove this entry
-		ebtables -D mac_checkpoint -o ! ${mac_mapping["$2"]} -d $2 -j DROP
+		ebtables -D mac_checkpoint -i ! ${mac_mapping["$2"]} -s $2 -j DROP
 		unset mac_mapping["$2"]
 		mac_expiring=("${mac_expiring[@]:1}") # slice off 0th element of array
 	done
@@ -197,7 +196,7 @@ function mac_check_timers {
 		fi
 		echo "New mac entry for $2 expiring"
 		# if this entry is expiring, remove "accept" rule, shift new array to remove this entry, and add new expiring entry
-		ebtables -D mac_checkpoint -o ${mac_mapping["$2"]} -d $2 -j mark --mark-set $ARP_MARK --mark-target CONTINUE
+		ebtables -D mac_checkpoint -i ${mac_mapping["$2"]} -s $2 -j mark --mark-set $MAC_MARK --mark-target CONTINUE
 		mac_expiring+=("$SECONDS $2")
 		mac_new=("${mac_new[@]:1}") # slice off 0th element of array
 	done
@@ -214,8 +213,8 @@ exec 3<>$ARP_FIFO_NAME # open r/w so when outer shell stops reading, it doesn't 
 logread -f -e ARP_CHECKPOINT | while read line
 do
 	# $line contains logged ARP_CHECKPOINT line -- parse out "IN" interface name and "ARP IP SRC" address
-	text=$(echo "$line" | sed -r 's/.*IN=([a-z0-9]+\.[0-9]+).*ARP IP SRC=([0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}).*/\1 \2/')
-	echo $text >&3
+	arp_text=$(echo "$line" | sed -r 's/.*IN=([a-z0-9]+\.[0-9]+).*ARP IP SRC=([0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}).*/\1 \2/')
+	echo $arp_text >&3
 done
 # close fifo
 exec 3>&-
@@ -228,9 +227,9 @@ exec 4<>$MAC_FIFO_NAME # open r/w so when outer shell stops reading, it doesn't 
 # read from logread and parse each line
 logread -f -e MAC_CHECKPOINT | while read line
 do
-	# $line contains logged MAC_CHECKPOINT line -- parse out "IN" interface name and "ARP IP SRC" address
-	text=$(echo "$line" | sed -r 's/.*IN=([a-z0-9]+\.[0-9]+).*MAC dest = ([A-Za-z0-9]{2}:[A-Za-z0-9]{2}:[A-Za-z0-9]{2}:[A-Za-z0-9]{2}:[A-Za-z0-9]{2}:[A-Za-z0-9]{2}).*/\1 \2/')
-	echo $text >&4
+	# $line contains logged MAC_CHECKPOINT line -- parse out "IN" interface name and "MAC source" address
+	mac_text=$(echo "$line" | sed -r 's/.*IN=([a-z0-9]+\.[0-9]+).*MAC source = ([A-Za-z0-9]{2}:[A-Za-z0-9]{2}:[A-Za-z0-9]{2}:[A-Za-z0-9]{2}:[A-Za-z0-9]{2}:[A-Za-z0-9]{2}).*/\1 \2/')
+	echo $mac_text >&4
 done
 # close fifo
 exec 4>&-
@@ -256,7 +255,7 @@ sleep 1
 (
 status=0
 while : ; do # loop forever
-	read -t 1 -a arp < $FIFO_NAME # timeout after 1 second so we can check timers even if there are no new arp packets to return us from read()
+	read -t 1 -a arp < $ARP_FIFO_NAME # timeout after 1 second so we can check timers even if there are no new arp packets to return us from read()
 	status=$? # status of the read command. 0 is a successful read. Anything else is an error or a timeout (probably timeout).
 	if [[ "$status" -eq "0" ]] ; then # if we got a new arp log
 		arp_make_new $arp
@@ -271,7 +270,7 @@ done
 (
 status=0
 while : ; do # loop forever
-	read -t 1 -a mac < $FIFO_NAME # timeout after 1 second so we can check timers even if there are no new mac packets to return us from read()
+	read -t 1 mac < $MAC_FIFO_NAME # timeout after 1 second so we can check timers even if there are no new mac packets to return us from read()
 	status=$? # status of the read command. 0 is a successful read. Anything else is an error or a timeout (probably timeout).
 	if [[ "$status" -eq "0" ]] ; then # if we got a new mac log
 		mac_make_new $mac
@@ -286,7 +285,8 @@ done
 # ╚═╝╝╚╝═╩╝
 
 # wait for any subshell to exit (expected on error only)
-wait -n
+#wait -n # openwrt's bash version doesn't support -n
+wait # has to wait for all subshells ... oh well
 kill 0 # kill any remaining subshells
 echo "Error: Subshell exited early. Quitting..."
 
