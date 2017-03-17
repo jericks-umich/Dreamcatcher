@@ -13,8 +13,8 @@ ebtables -F
 ebtables --new-chain arp_checkpoint
 ebtables -A INPUT -p arp -j arp_checkpoint
 ebtables -A FORWARD -p arp -j arp_checkpoint
-ebtables -A arp_checkpoint --log --log-prefix ARP_CHECKPOINT --log-arp # default rule to log anything that isn't caught beforehand
-ebtables -I arp_checkpoint --arp-src-ip 192.168.1.1 -j DROP # default rule to prevent router's ip from being stolen
+ebtables -A arp_checkpoint -p arp --log --log-prefix ARP_CHECKPOINT --log-arp # default rule to log anything that isn't caught beforehand
+ebtables -I arp_checkpoint -p arp --arp-ip-src 192.168.1.1 -j DROP # default rule to prevent router's ip from being stolen
 
 # make subshell exit when main shell does
 trap "kill 0" SIGINT
@@ -61,9 +61,11 @@ function make_new {
 	arp=$1
 	iface=${arp[0]}
 	ip=${arp[1]}
+	echo "New arp: $ip -> $iface"
 
 	# check if we have this mapping already
 	if [[ ${mapping["$ip"]+1} ]] ; then
+		echo "We already have this mapping"
 		# since we already have the mapping, check if its expiring and if so refresh it (if not, it might be a duplicate that slipped through)
 		expiring_len=${#expiring[@]}
 		for (( i=0; i<${expiring_len}; i++ )); # iterate over expiring entries
@@ -73,8 +75,10 @@ function make_new {
 				# verify the mapping is still the same
 				if [[ ${mapping["$ip"]} == "$iface" ]] ; then
 					new+=("$SECONDS $ip") # refreshed entry into new queue
-					expiring=("${expiring[@]:0:$i}" "${expiring[@]:$(expr $i + 1)}") # slice/concat expiring queue to remove element
-					ebtables -I arp_checkpoint -i $iface --arp-src-ip $ip -j ACCEPT
+					j=$(expr $i + 1)
+					expiring=("${expiring[@]:0:$i}" "${expiring[@]:$j}") # slice/concat expiring queue to remove element
+					ebtables -I arp_checkpoint -p arp -i $iface --arp-ip-src $ip -j ACCEPT
+					echo "Refreshed expired -> new"
 				else # if the mapping is different, AHHHHHHHH!!!!!
 					echo "ERROR: mapping is different!"
 					old_iface=${mapping["$ip"]}
@@ -86,35 +90,40 @@ function make_new {
 			fi
 		done
 	else # if we don't have this mapping
+		echo "New mapping"
 		# add this mapping and add its timestamp to the New queue
 		mapping["$ip"]="$iface"
 		new+=("$SECONDS $ip")
 		# add new ebtables rules
-		ebtables -I arp_checkpoint -i $iface --arp-src-ip $ip -j ACCEPT
-		ebtables -I arp_checkpoint -i ! $iface --arp-src-ip $ip -j DROP
+		ebtables -I arp_checkpoint -p arp -i ! $iface --arp-ip-src $ip -j DROP
+		ebtables -I arp_checkpoint -p arp -i $iface --arp-ip-src $ip -j ACCEPT
 	fi
 }
 
 # check the timers for expiring and new arps and change state as appropriate
 function check_timers {
 	# check timers for expiring first, then new (and no, I can't figure out how to check them both with a loop -- bash is annoying)
-	set ${expiring[0]} # maps start time to $1 and IP to $2, for this expiring entry
-	while [[ "$(expr $SECONDS - $1)" -gt "$TIMEOUT_EXPIRING" ]] ; do
+	while [[ "${#expiring[@]}" -gt "0" ]] ; do
+		set ${expiring[0]} # maps start time to $1 and IP to $2, for this expiring entry
+		if [[ "$(expr $SECONDS - $1)" -lt "$TIMEOUT_EXPIRING" ]] ; then
+			break
+		fi
+		echo "Expiring entry for $2 expired"
 		# if this entry is expired, remove "drop" rule, remove mapping, shift expiring array to remove this entry
-		ebtables -D arp_checkpoint -i ! ${mapping["$2"]} --arp-src-ip $2 -j DROP
+		ebtables -D arp_checkpoint -p arp -i ! ${mapping["$2"]} --arp-ip-src $2 -j DROP
 		unset mapping["$2"]
 		expiring=("${expiring[@]:1}") # slice off 0th element of array
-		# re-set $1 and $2 at new start of expiring array
-		set ${expiring[0]} # maps start time to $1 and IP to $2, for this expiring entry
 	done
-	set ${new[0]} # maps start time to $1 and IP to $2, for this new entry
-	while [[ "$(expr $SECONDS - $1)" -gt "$TIMEOUT_NEW" ]] ; do
-		# if this entry is expiring, remove "accept" rule, shift new array to remove this entry, and add new expiring entry
-		ebtables -D arp_checkpoint -i ${mapping["$2"]} --arp-src-ip $2 -j ACCEPT
-		new=("${new[@]:1}") # slice off 0th element of array
-		expiring+=("$SECONDS $2")
-		# re-set $1 and $2 at new start of new array
+	while [[ "${#new[@]}" -gt "0" ]] ; do
 		set ${new[0]} # maps start time to $1 and IP to $2, for this new entry
+		if [[ "$(expr $SECONDS - $1)" -lt "$TIMEOUT_NEW" ]] ; then
+			break
+		fi
+		echo "New entry for $2 expiring"
+		# if this entry is expiring, remove "accept" rule, shift new array to remove this entry, and add new expiring entry
+		ebtables -D arp_checkpoint -p arp -i ${mapping["$2"]} --arp-ip-src $2 -j ACCEPT
+		expiring+=("$SECONDS $2")
+		new=("${new[@]:1}") # slice off 0th element of array
 	done
 }
 
