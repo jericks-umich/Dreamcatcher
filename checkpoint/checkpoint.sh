@@ -28,10 +28,12 @@ $EBTABLES -A INPUT -p arp -j arp_checkpoint
 $EBTABLES -A FORWARD -p arp -j arp_checkpoint
 $EBTABLES -A arp_checkpoint --mark ! $ARP_MARK -p arp --log --log-prefix ARP_CHECKPOINT --log-arp -j CONTINUE # default rule to log anything that isn't caught beforehand
 $EBTABLES -I arp_checkpoint -p arp --arp-ip-src 192.168.1.1 -j DROP # default rule to prevent router's ip from being stolen
-$EBTABLES --new-chain mac_checkpoint -P RETURN
-#$EBTABLES -I INPUT -j mac_checkpoint # don't do this because we're filtering by outbound iface
-$EBTABLES -I FORWARD -j mac_checkpoint
-$EBTABLES -A mac_checkpoint --mark ! $MAC_MARK --log --log-prefix MAC_CHECKPOINT -j CONTINUE # default rule to log anything that isn't caught beforehand
+$EBTABLES --new-chain mac_log_checkpoint -P RETURN
+$EBTABLES --new-chain mac_block_checkpoint -P RETURN
+$EBTABLES -I INPUT -j mac_log_checkpoint
+$EBTABLES -I FORWARD -j mac_log_checkpoint
+$EBTABLES -I FORWARD -j mac_block_checkpoint # block should be before log (thus why it's second, since they're inserted)
+$EBTABLES -A mac_log_checkpoint --mark ! $MAC_MARK --log --log-prefix MAC_CHECKPOINT -j CONTINUE # default rule to log anything that isn't caught beforehand
 
 # make subshells exit when main shell does
 trap "kill 0" SIGINT
@@ -127,7 +129,7 @@ function mac_make_new {
 					mac_new+=("$SECONDS $mac") # refreshed entry into new queue
 					j=$(expr $i + 1)
 					mac_expiring=("${mac_expiring[@]:0:$i}" "${mac_expiring[@]:$j}") # slice/concat expiring queue to remove element
-					$EBTABLES -I mac_checkpoint -i $iface -s $mac -j mark --mark-set $MAC_MARK --mark-target CONTINUE
+					$EBTABLES -I mac_log_checkpoint -i $iface -s $mac -j mark --mark-set $MAC_MARK --mark-target CONTINUE
 					echo "Refreshed mac expired -> new"
 				else # if the mapping is different, AHHHHHHHH!!!!!
 					echo "ERROR: mac mapping is different!"
@@ -145,8 +147,8 @@ function mac_make_new {
 		mac_mapping["$mac"]="$iface"
 		mac_new+=("$SECONDS $mac")
 		# add new ebtables rules
-		$EBTABLES -I mac_checkpoint -o ! $iface -d $mac -j DROP
-		$EBTABLES -I mac_checkpoint -i $iface -s $mac -j mark --mark-set $MAC_MARK --mark-target CONTINUE
+		$EBTABLES -I mac_block_checkpoint -o ! $iface -d $mac -j DROP
+		$EBTABLES -I mac_log_checkpoint -i $iface -s $mac -j mark --mark-set $MAC_MARK --mark-target CONTINUE
 	fi
 }
 
@@ -186,7 +188,7 @@ function mac_check_timers {
 		fi
 		echo "Expiring mac entry for $2 expired"
 		# if this entry is expired, remove "drop" rule, remove mapping, shift expiring array to remove this entry
-		$EBTABLES -D mac_checkpoint -o ! ${mac_mapping["$2"]} -d $2 -j DROP
+		$EBTABLES -D mac_block_checkpoint -o ! ${mac_mapping["$2"]} -d $2 -j DROP
 		unset mac_mapping["$2"]
 		mac_expiring=("${mac_expiring[@]:1}") # slice off 0th element of array
 	done
@@ -197,7 +199,7 @@ function mac_check_timers {
 		fi
 		echo "New mac entry for $2 expiring"
 		# if this entry is expiring, remove "accept" rule, shift new array to remove this entry, and add new expiring entry
-		$EBTABLES -D mac_checkpoint -i ${mac_mapping["$2"]} -s $2 -j mark --mark-set $MAC_MARK --mark-target CONTINUE
+		$EBTABLES -D mac_log_checkpoint -i ${mac_mapping["$2"]} -s $2 -j mark --mark-set $MAC_MARK --mark-target CONTINUE
 		mac_expiring+=("$SECONDS $2")
 		mac_new=("${mac_new[@]:1}") # slice off 0th element of array
 	done
