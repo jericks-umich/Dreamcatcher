@@ -40,8 +40,7 @@ endef
 define Package/dreamcatcher/install
 	$(INSTALL_DIR) $(1)/usr/sbin
 	$(INSTALL_BIN) $(PKG_BUILD_DIR)/$(PKG_NAME) $(1)/usr/sbin/
-	$(INSTALL_DIR) $(1)/usr/sbin
-	$(INSTALL_BIN) ./checkpoint/checkpoint.sh $(1)/bin/checkpoint
+	$(INSTALL_BIN) ./files/checkpoint.sh $(1)/usr/sbin/checkpoint
 	$(INSTALL_DIR) $(1)/etc/init.d
 	$(INSTALL_BIN) ./files/dreamcatcher.init $(1)/etc/init.d/dreamcatcher
 	$(INSTALL_BIN) ./files/checkpoint.init $(1)/etc/init.d/checkpoint
