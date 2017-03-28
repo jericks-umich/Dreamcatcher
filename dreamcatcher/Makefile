@@ -40,6 +40,7 @@ endef
 define Package/dreamcatcher/install
 	$(INSTALL_DIR) $(1)/usr/sbin
 	$(INSTALL_BIN) $(PKG_BUILD_DIR)/$(PKG_NAME) $(1)/usr/sbin/
+	$(INSTALL_DIR) $(1)/etc/init.d
 	$(INSTALL_BIN) ./files/dreamcatcher.init $(1)/etc/init.d/dreamcatcher
 endef
 
