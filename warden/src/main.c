@@ -23,6 +23,8 @@
 
 #define TAG "MAIN"
 
+struct json_object *  j_obj;
+
 //From Dreamcatcher
 unsigned int get_src_vlan(struct nfq_data *tb) {
     struct nlif_handle* h;
@@ -43,18 +45,18 @@ unsigned int get_src_vlan(struct nfq_data *tb) {
     return (unsigned int) strtol(vlan_ptr, NULL, 10); // returns 0 if unable to convert to integer
 }
 
-//Queue 1 VLAN Processing
-void handle_packet(struct nfq_data *tb) {
+//VLAN Processing
+void handle_packet(struct nfq_data *tb, int index) {
     
     unsigned int vlan = get_src_vlan(tb);
     char vlan_s[5];
     
     FILE * fp;
-    while(fp = fopen("/var/run/warden.vlan", "r")){
+    while(fp = fopen(j_obj[index]["Filename"], "r")){
         fclose(fp);
         sleep(1);
     }
-    fp = fopen("/var/run/warden.vlan", "w");
+    fp = fopen(j_obj[index]["Filename"], "w");
     
     snprintf(vlan_s, 5, "%d", vlan);
     fputs(vlan_s, fp);
@@ -64,28 +66,8 @@ void handle_packet(struct nfq_data *tb) {
     return;
 }
 
-//Queue 2 VLAN Processing
-void handle_packet2(struct nfq_data *tb) {
-    
-    unsigned int vlan = get_src_vlan(tb);
-    char vlan_s[5];
-    
-    FILE * fp;
-    while(fp = fopen("/var/run/warden.vlan2", "r")){
-        fclose(fp);
-        sleep(1);
-    }
-    fp = fopen("/var/run/warden.vlan2", "w");
-    
-    snprintf(vlan_s, 5, "%d", vlan);
-    fputs(vlan_s, fp);
-    
-    fclose(fp);
-    
-    return;
-}
 
-//Queue 1 Callback
+//Callback
 int cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struct nfq_data *nfa, void *data)
 {
     LOGV("Got callback!");
@@ -100,32 +82,12 @@ int cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struct nfq_data *nfa, vo
         LOGW("Cannot parse packet. Not sure what to do!");
     }
     
-    handle_packet(nfa);
+    handle_packet(nfa, (int)data);
     
     ret = nfq_set_verdict(qh, id, verdict, 0, NULL);
     return ret;
 }
 
-//Queue 2 Callback
-int cb2(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struct nfq_data *nfa, void *data)
-{
-    LOGV("Got callback 2!");
-    int ret;
-    int id;
-    u_int32_t verdict = NF_ACCEPT;
-    
-    struct nfqnl_msg_packet_hdr *ph = nfq_get_msg_packet_hdr(nfa);
-    if (ph) {
-        id = ntohl(ph->packet_id);
-    } else {
-        LOGW("Cannot parse packet. Not sure what to do!");
-    }
-    
-    handle_packet(nfa);
-    
-    ret = nfq_set_verdict(qh, id, verdict, 0, NULL);
-    return ret;
-}
 
 void * parentFunc(void *arg){
 
@@ -155,8 +117,8 @@ void * parentFunc(void *arg){
         LOGE("error during nfq_bind_pf()");
         exit(1);
     }
-    LOGV("binding this socket to queue '%d'", QUEUE_NUM);
-    qh = nfq_create_queue(h, QUEUE_NUM, &cb, NULL);
+    LOGV("binding this socket to queue '%d'", (u_int16_t)j_obj[(int)arg]["Queue"]);
+    qh = nfq_create_queue(h, (u_int16_t)j_obj[(int)arg]["Queue"], &cb, NULL);
     if (!qh) {
         LOGE("error during nfq_create_queue()");
         exit(1);
@@ -182,70 +144,26 @@ void * parentFunc(void *arg){
 
 }
 
-void *parentFunc2(void * arg){
-
-    struct nfq_handle *h;
-    struct nfq_q_handle *qh;
-    struct nfnl_handle *nh;
-    int fd;
-    int rv;
-    int ret;
-    char buf[4096] __attribute__ ((aligned));
-    
-    // create handle to nfqueue and watch for new packets to handle
-    LOGV("opening library handle");
-    h = nfq_open();
-    if (!h) {
-        LOGE("error during nfq_open()");
-        exit(1);
-    }
-    LOGV("unbinding existing nf_queue handler for AF_INET (if any)");
-    if (nfq_unbind_pf(h, AF_INET) < 0) {
-        LOGE("error during nfq_unbind_pf()");
-        exit(1);
-    }
-    LOGV("binding nfnetlink_queue as nf_queue handler for AF_INET");
-    if (nfq_bind_pf(h, AF_INET) < 0) {
-        LOGE("error during nfq_bind_pf()");
-        exit(1);
-    }
-    LOGV("binding this socket to queue '%d'", QUEUE_NUM2);
-    qh = nfq_create_queue(h, QUEUE_NUM2, &cb2, NULL);
-    if (!qh) {
-        LOGE("error during nfq_create_queue()");
-        exit(1);
-    }
-    LOGV("setting copy_packet mode");
-    if (nfq_set_mode(qh, NFQNL_COPY_PACKET, 0xffff) < 0) {
-        LOGE("can't set packet_copy mode");
-        exit(1);
-    }
-    fd = nfq_fd(h);
-    
-    while ((rv = recv(fd, buf, sizeof(buf), 0)) && rv >= 0) {
-        LOGV("pkt received");
-        ret = nfq_handle_packet(h, buf, rv);
-        LOGV("nfq_handle_packet returns %d", ret);
-    }
-    
-    LOGD("Quitting because we received %d: %s", rv, strerror(errno));
-    LOGV("unbinding from queue %d", QUEUE_NUM2);
-    nfq_destroy_queue(qh);
-    LOGV("closing library handle");
-    nfq_close(h);
-
-}
-
 
 int main(int argc, char **argv)
 {
+    static const char filename [] = "/tmp/test.txt";
+    j_obj = json_object_from_file(filename);
+    int numThreads = json_object_array_length(json_object);
+    
+    //Dynamically allocate numThreads threads
+    pthread_t * id_array;
+    id_array = (pthread_t*)malloc(sizeof(pthread_t) * numThreads);
+    for (int i = 0; i < numThreads; ++i){
+        
+        pthread_t th1;
+        int thisIndex = INDEX_NUM; 
+        INDEX_NUM += 1;
+        pthread_create(&id_array[i], NULL, parentFunc, thisIndex);
+        pthread_join(id_array[i], NULL);
+        
+    }
 
-    pthread_t th1, th2;
-    pthread_create(&th1, NULL, parentFunc, "");
-    pthread_create(&th2, NULL, parentFunc2, "");
-
-    pthread_join(th1, NULL);
-    pthread_join(th2, NULL);
     
     exit(0);
 }
