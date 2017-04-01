@@ -216,7 +216,7 @@ exec 3<>$ARP_FIFO_NAME # open r/w so when outer shell stops reading, it doesn't 
 logread -f -e ARP_CHECKPOINT | while read line
 do
 	# $line contains logged ARP_CHECKPOINT line -- parse out "IN" interface name and "ARP IP SRC" address
-	arp_text=$(echo "$line" | sed -r 's/.*IN=([a-z0-9]+\.[0-9]+).*ARP IP SRC=([0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}).*/\1 \2/')
+	arp_text=$(echo "$line" | sed -r 's/.*IN=([a-z0-9]+(\.[0-9]+)?).*ARP IP SRC=([0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}).*/\1 \3/')
 	echo $arp_text >&3
 done
 # close fifo
@@ -231,7 +231,7 @@ exec 4<>$MAC_FIFO_NAME # open r/w so when outer shell stops reading, it doesn't 
 logread -f -e MAC_CHECKPOINT | while read line
 do
 	# $line contains logged MAC_CHECKPOINT line -- parse out "IN" interface name and "MAC source" address
-	mac_text=$(echo "$line" | sed -r 's/.*IN=([a-z0-9]+\.[0-9]+).*MAC source = ([A-Za-z0-9]{2}:[A-Za-z0-9]{2}:[A-Za-z0-9]{2}:[A-Za-z0-9]{2}:[A-Za-z0-9]{2}:[A-Za-z0-9]{2}).*/\1 \2/')
+	mac_text=$(echo "$line" | sed -r 's/.*IN=([a-z0-9]+(\.[0-9]+)?).*MAC source = ([A-Za-z0-9]{2}:[A-Za-z0-9]{2}:[A-Za-z0-9]{2}:[A-Za-z0-9]{2}:[A-Za-z0-9]{2}:[A-Za-z0-9]{2}).*/\1 \3/'
 	echo $mac_text >&4
 done
 # close fifo
