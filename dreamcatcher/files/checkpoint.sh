@@ -30,10 +30,15 @@ $EBTABLES -A arp_checkpoint --mark ! $ARP_MARK -p arp --log --log-prefix ARP_CHE
 $EBTABLES -I arp_checkpoint -p arp --arp-ip-src 192.168.1.1 -j DROP # default rule to prevent router's ip from being stolen
 $EBTABLES --new-chain mac_log_checkpoint -P RETURN
 $EBTABLES --new-chain mac_block_checkpoint -P RETURN
+$EBTABLES --new-chain mac_block_router_checkpoint -P RETURN
 $EBTABLES -I INPUT -j mac_log_checkpoint
 $EBTABLES -I FORWARD -j mac_log_checkpoint
 $EBTABLES -I FORWARD -j mac_block_checkpoint # block should be before log (thus why it's second, since they're inserted)
+$EBTABLES -I INPUT -j mac_block_router_checkpoint
+$EBTABLES -I FORWARD -j mac_block_router_checkpoint
 $EBTABLES -A mac_log_checkpoint --mark ! $MAC_MARK --log --log-prefix MAC_CHECKPOINT -j CONTINUE # default rule to log anything that isn't caught beforehand
+$EBTABLES -I mac_block_router_checkpoint -s 60:E3:27:FB:55:5E -j DROP # generate these dynamically to block masquerading as the router
+$EBTABLES -I mac_block_router_checkpoint -s 60:E3:27:FB:55:5F -j DROP # generate these dynamically to block masquerading as the router
 
 # make subshells exit when main shell does
 trap "kill 0" SIGINT
