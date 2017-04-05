@@ -22,12 +22,12 @@ the configuration files and patches into place, and run `make`.
 # Post-installation
 You will need to copy over some configuration files to set up the freeradius2
 RADIUS server, certificates, etc.
-Use scp to copy freeradius2/ to /etc/freeradius2/ on the router, and CA/ to
-/root/CA/ on the router.
+Use scp to copy freeradius2/ to /etc/freeradius2/ on the router.
 Then, restart the RADIUS server with `/etc/init.d/radiusd restart`.
 
-You will need to enable iptables to use the physdev module by changing
+You will need to enable iptables and arptables to use the physdev module by changing
 'net.bridge.bridge-nf-call-iptables=0' to '=1' in /etc/sysctl.conf.
+'net.bridge.bridge-nf-call-arptables=0' to '=1' in /etc/sysctl.conf.
 
 You will need to edit /etc/config/firewall and add
 'option DREAMCATCHER 1'

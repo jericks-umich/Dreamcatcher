@@ -40,6 +40,14 @@ endef
 define Package/dreamcatcher/install
 	$(INSTALL_DIR) $(1)/usr/sbin
 	$(INSTALL_BIN) $(PKG_BUILD_DIR)/$(PKG_NAME) $(1)/usr/sbin/
+	$(INSTALL_BIN) ./files/checkpoint.sh $(1)/usr/sbin/checkpoint
+	$(INSTALL_DIR) $(1)/etc/init.d
+	$(INSTALL_BIN) ./files/dreamcatcher.init $(1)/etc/init.d/dreamcatcher
+	$(INSTALL_BIN) ./files/checkpoint.init $(1)/etc/init.d/checkpoint
+	# HACK -- need to make the CA files persistent, and don't feel like modifying the freeradius package (too much work)
+	# so we're going to do it here
+	$(INSTALL_DIR) $(1)/lib/upgrade/keep.d
+	$(INSTALL_BIN) ./files/freeradius2.keep $(1)/lib/upgrade/keep.d/freeradius2
 endef
 
 $(eval $(call BuildPackage,dreamcatcher))
