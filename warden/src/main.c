@@ -52,11 +52,11 @@ void handle_packet(struct nfq_data *tb, int index) {
     char vlan_s[5];
     
     FILE * fp;
-    while(fp = fopen(j_obj[index]["Filename"], "r")){
+    while(fp = fopen((*j_obj)[index]["Filename"], "r")){
         fclose(fp);
         sleep(1);
     }
-    fp = fopen(j_obj[index]["Filename"], "w");
+    fp = fopen((*j_obj)[index]["Filename"], "w");
     
     snprintf(vlan_s, 5, "%d", vlan);
     fputs(vlan_s, fp);
@@ -117,7 +117,7 @@ void * parentFunc(void *arg){
         LOGE("error during nfq_bind_pf()");
         exit(1);
     }
-    LOGV("binding this socket to queue '%d'", (u_int16_t)j_obj[(int)arg]["Queue"]);
+    LOGV("binding this socket to queue '%d'", (u_int16_t)(*j_obj)[(int)arg]["Queue"]);
     qh = nfq_create_queue(h, (u_int16_t)j_obj[(int)arg]["Queue"], &cb, NULL);
     if (!qh) {
         LOGE("error during nfq_create_queue()");
