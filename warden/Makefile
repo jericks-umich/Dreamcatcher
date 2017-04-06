@@ -38,6 +38,8 @@ endef
 define Package/warden/install
 	$(INSTALL_DIR) $(1)/usr/sbin
 	$(INSTALL_BIN) $(PKG_BUILD_DIR)/$(PKG_NAME) $(1)/usr/sbin/
+	$(INSTALL_DIR) $(1)/etc/init.d
+	$(INSTALL_BIN) ./files/warden.init $(1)/etc/init.d/warden
 endef
 
 $(eval $(call BuildPackage,warden))

@@ -30,10 +30,15 @@ $EBTABLES -A arp_checkpoint --mark ! $ARP_MARK -p arp --log --log-prefix ARP_CHE
 $EBTABLES -I arp_checkpoint -p arp --arp-ip-src 192.168.1.1 -j DROP # default rule to prevent router's ip from being stolen
 $EBTABLES --new-chain mac_log_checkpoint -P RETURN
 $EBTABLES --new-chain mac_block_checkpoint -P RETURN
+$EBTABLES --new-chain mac_block_router_checkpoint -P RETURN
 $EBTABLES -I INPUT -j mac_log_checkpoint
 $EBTABLES -I FORWARD -j mac_log_checkpoint
 $EBTABLES -I FORWARD -j mac_block_checkpoint # block should be before log (thus why it's second, since they're inserted)
+$EBTABLES -I INPUT -j mac_block_router_checkpoint
+$EBTABLES -I FORWARD -j mac_block_router_checkpoint
 $EBTABLES -A mac_log_checkpoint --mark ! $MAC_MARK --log --log-prefix MAC_CHECKPOINT -j CONTINUE # default rule to log anything that isn't caught beforehand
+$EBTABLES -I mac_block_router_checkpoint -s 60:E3:27:FB:55:5E -j DROP # generate these dynamically to block masquerading as the router
+$EBTABLES -I mac_block_router_checkpoint -s 60:E3:27:FB:55:5F -j DROP # generate these dynamically to block masquerading as the router
 
 # make subshells exit when main shell does
 trap "kill 0" SIGINT
@@ -216,7 +221,7 @@ exec 3<>$ARP_FIFO_NAME # open r/w so when outer shell stops reading, it doesn't 
 logread -f -e ARP_CHECKPOINT | while read line
 do
 	# $line contains logged ARP_CHECKPOINT line -- parse out "IN" interface name and "ARP IP SRC" address
-	arp_text=$(echo "$line" | sed -r 's/.*IN=([a-z0-9]+\.[0-9]+).*ARP IP SRC=([0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}).*/\1 \2/')
+	arp_text=$(echo "$line" | sed -r 's/.*IN=([a-z0-9]+(\.[0-9]+)?).*ARP IP SRC=([0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}).*/\1 \3/')
 	echo $arp_text >&3
 done
 # close fifo
@@ -231,7 +236,7 @@ exec 4<>$MAC_FIFO_NAME # open r/w so when outer shell stops reading, it doesn't 
 logread -f -e MAC_CHECKPOINT | while read line
 do
 	# $line contains logged MAC_CHECKPOINT line -- parse out "IN" interface name and "MAC source" address
-	mac_text=$(echo "$line" | sed -r 's/.*IN=([a-z0-9]+\.[0-9]+).*MAC source = ([A-Za-z0-9]{2}:[A-Za-z0-9]{2}:[A-Za-z0-9]{2}:[A-Za-z0-9]{2}:[A-Za-z0-9]{2}:[A-Za-z0-9]{2}).*/\1 \2/')
+	mac_text=$(echo "$line" | sed -r 's/.*IN=([a-z0-9]+(\.[0-9]+)?).*MAC source = ([A-Za-z0-9]{2}:[A-Za-z0-9]{2}:[A-Za-z0-9]{2}:[A-Za-z0-9]{2}:[A-Za-z0-9]{2}:[A-Za-z0-9]{2}).*/\1 \3/')
 	echo $mac_text >&4
 done
 # close fifo
