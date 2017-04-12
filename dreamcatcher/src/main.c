@@ -495,7 +495,7 @@ void alert_user(rule* r) {
 	int buffer_len = 32+message_size+1;
 	char buffer[buffer_len];
 	memcpy(buffer, r->hash, 32);
-	memcpy(buffer, r->message, message_size+1);/*	= ("rule id:%s, message:%s",(rule_id, message));*/
+	memcpy(buffer + 32, r->message, message_size+1);/*	= ("rule id:%s, message:%s",(rule_id, message));*/
 	int bytesSent = send(sock, &buffer, buffer_len, 0);
 	if(bytesSent != buffer_len){
 		LOGE("THERE WAS AN ISSUE SENDING THE MESSAGE! THERE WERE %d bytes sent and there should have been %d bytes sent.", bytesSent, buffer_len);
