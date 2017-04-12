@@ -462,7 +462,7 @@ void print_icmp(struct icmphdr* i) {
 
 void* alert_user(void* args) {
 	while(true){
-		if(rule[0]){
+		if(rules[0]){
 			// same port as on which android will be listening
 			int connection_port = 6000;
 			// address of the phone on the network
@@ -505,11 +505,11 @@ void* alert_user(void* args) {
 			// optimize for speed by having it not unlock and lock in the loop,
 			// however, this would favor alerting the user over adding rules to
 			// config file
-			while(rule[0]){
+			while(rules[0]){
 				// lock here
 				pthread_mutex_lock(&lock);
 				--numRules;
-				rule* r = &rule[numRules];
+				rule* r = &rules[numRules];
 				// get message size as C-str
 				int message_size = strnlen(r->message, 128);
 	
@@ -523,7 +523,7 @@ void* alert_user(void* args) {
 					LOGE("THERE WAS AN ISSUE SENDING THE MESSAGE! THERE WERE %d bytes sent and there should have been %d bytes sent.", bytesSent, buffer_len);
 				}
 				// zero out the rule that was just sent
-				memcpy(rules + numRUles, 0, sizeof(struct rule));
+				memcpy(rules + numRules, 0, sizeof(struct rule));
 				// unlock here
 				pthread_mutex_unlock(&lock);
 			}
@@ -581,7 +581,7 @@ int main(int argc, char **argv)
   int ret;
 	char buf[4096] __attribute__ ((aligned));
 	// make sure the queue is zeroed out
-	memcpy(rules, 0, sizeof(rules));
+	memset(rules, 0, sizeof(rules));
 	//initialize the lock
 	if(pthread_mutex_init(&lock, NULL) != 0){
 		LOGE("Mutex initialization failed! Program may deadlock");
