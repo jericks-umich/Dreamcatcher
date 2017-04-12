@@ -331,8 +331,18 @@ int add_rule(struct nfq_data *tb, u_int32_t* verdict) {
   }
   if (ret == 0) { // if success
     // pass the new rule to conductor
-    LOGD("Alerting user");
-    alert_user(&new_rule);
+    LOGD("SUCCESSFULLY ADDED RULE TO CONFIG FILE");
+    pthread_mutex_lock(&lock);
+    if(numRules < MAX_QUEUE_SIZE){
+    	LOGD("Adding rule to queue to be sent");
+	// copy the rule into the queue
+    	memcpy(rules + numRules, &new_rule, sizeof(struct rule));
+	++numRules;
+    }
+    else{
+    	LOGD("Rule Queue is full");
+    }
+    pthread_mutex_unlock(&lock);
   } else {
     LOGD("Could not write rule to the config file.");
   }
@@ -450,69 +460,84 @@ void print_icmp(struct icmphdr* i) {
 	LOGV("Rest of header:  0x%x", (unsigned int)i->un.gateway); // just grabbing any union field
 }
 
-void alert_user(rule* r) {
-	// same port as on which android will be listening
-	int connection_port = 6000;
-	// address of the phone on the network
-	char connection_addr[] = "192.168.1.129";
-	void* dst = malloc(sizeof(struct in_addr));
-	// set up socket
-	int sock = 0;
-	sock = socket(AF_INET, SOCK_STREAM, 0);
-	if (sock < 0) {
-		LOGE("ERROR OPENING SOCKET!!!");	
-	}
-	//int yes = 1;
-	//if (0>setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(yes))) {
-	//	LOGE("ERROR SETTING SOCKET OPTIONS");
-	//}
-	struct sockaddr_in addr;
-	memset(&addr, 0, sizeof(addr));
-	addr.sin_family = AF_INET;
-	// set the port the app is listening on
-	addr.sin_port = htons(connection_port);
-	// set the address of the phone is listening on
-	if(inet_pton(AF_INET, connection_addr, dst)< 1){
-		LOGE("ERROR CONVERTING ADDRESS TO IN_ADDR");
-	}
-	memcpy((void*)&addr.sin_addr, dst, sizeof(addr.sin_addr));
-
-	// get message size as C-str
-	int message_size = strnlen(r->message, 128);
-	// connect to the phone
-	//int made_connection = 0;
-	//while(!made_connection){
-	//	if((connect(sock, (struct sockaddr*)&addr, sizeof(addr))) < 0){
-	//		LOGE("PHONE IS NOT ON THE NETWORK RIGHT NOW! %d", errno);
-	//		sleep(60); // this will cause the thread to sleep for a minute
-	//	}
-	//	else{
-	//		made_connection = 1;
-	//	}
-	//}
-
-	fcntl(sock, F_SETFL, O_NONBLOCK); // set into non-blocking mode
-
-	if ((connect(sock, (struct sockaddr*)&addr, sizeof(addr))) < 0) {
-		LOGE("PHONE IS NOT ON THE NETWORK RIGHT NOW! %d", errno);
-		close(sock);
-		return;
-	}
+void* alert_user(void* args) {
+	while(true){
+		if(rule[0]){
+			// same port as on which android will be listening
+			int connection_port = 6000;
+			// address of the phone on the network
+			char connection_addr[] = "192.168.1.129";
+			void* dst = malloc(sizeof(struct in_addr));
+			// set up socket
+			int sock = 0;
+			sock = socket(AF_INET, SOCK_STREAM, 0);
+			if (sock < 0) {
+				LOGE("ERROR OPENING SOCKET!!!");	
+			}
+			//int yes = 1;
+			//if (0>setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(yes))) {
+			//	LOGE("ERROR SETTING SOCKET OPTIONS");
+			//}
+			struct sockaddr_in addr;
+			memset(&addr, 0, sizeof(addr));
+			addr.sin_family = AF_INET;
+			// set the port the app is listening on
+			addr.sin_port = htons(connection_port);
+			// set the address of the phone is listening on
+			if(inet_pton(AF_INET, connection_addr, dst)< 1){
+				LOGE("ERROR CONVERTING ADDRESS TO IN_ADDR");
+			}
+			memcpy((void*)&addr.sin_addr, dst, sizeof(addr.sin_addr));
 	
-	//craft buffer and send message --> will this work?
-	int buffer_len = 32+message_size;
-	char buffer[buffer_len];
-	memcpy(buffer, r->hash, 32);
-	memcpy(buffer + 32, r->message, message_size);/*	= ("rule id:%s, message:%s",(rule_id, message));*/
-	int bytesSent = send(sock, &buffer, buffer_len, 0);
-	if(bytesSent != buffer_len){
-		LOGE("THERE WAS AN ISSUE SENDING THE MESSAGE! THERE WERE %d bytes sent and there should have been %d bytes sent.", bytesSent, buffer_len);
-	}
+			// connect to the phone
+			int made_connection = 0;
+			while(!made_connection){
+				if((connect(sock, (struct sockaddr*)&addr, sizeof(addr))) < 0){
+					LOGE("PHONE IS NOT ON THE NETWORK RIGHT NOW! %d", errno);
+					sleep(60); // this will cause the thread to sleep for a minute
+				}
+				else{
+					made_connection = 1;
+				}
+			}	
 	
-	// close the connection to the phone
-	close(sock);
+			fcntl(sock, F_SETFL, O_NONBLOCK); // set into non-blocking mode
+			// optimize for speed by having it not unlock and lock in the loop,
+			// however, this would favor alerting the user over adding rules to
+			// config file
+			while(rule[0]){
+				// lock here
+				pthread_mutex_lock(&lock);
+				--numRules;
+				rule* r = &rule[numRules];
+				// get message size as C-str
+				int message_size = strnlen(r->message, 128);
+	
+				//craft buffer and send message --> will this work?
+				int buffer_len = 32+message_size;
+				char buffer[buffer_len];
+				memcpy(buffer, r->hash, 32);
+				memcpy(buffer + 32, r->message, message_size);/*	= ("rule id:%s, message:%s",(rule_id, message));*/
+				int bytesSent = send(sock, &buffer, buffer_len, 0);
+				if(bytesSent != buffer_len){
+					LOGE("THERE WAS AN ISSUE SENDING THE MESSAGE! THERE WERE %d bytes sent and there should have been %d bytes sent.", bytesSent, buffer_len);
+				}
+				// zero out the rule that was just sent
+				memcpy(rules + numRUles, 0, sizeof(struct rule));
+				// unlock here
+				pthread_mutex_unlock(&lock);
+			}
+						
+			// close the connection to the phone
+			close(sock);
 
-	return;
+		}
+		else{
+			LOGD("No rules to send, sleeping for 60 seconds");
+			sleep(60);
+		}
+		
+	}
 }
 
 int cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struct nfq_data *nfa, void *data)
@@ -555,6 +580,18 @@ int main(int argc, char **argv)
 	int rv;
   int ret;
 	char buf[4096] __attribute__ ((aligned));
+	// make sure the queue is zeroed out
+	memcpy(rules, 0, sizeof(rules));
+	//initialize the lock
+	if(pthread_mutex_init(&lock, NULL) != 0){
+		LOGE("Mutex initialization failed! Program may deadlock");
+		// would you like to abort in here?
+	}
+	// TODO: Potential optimization --> build destructor that cleans up thread memory
+	// in case program exits due to an error
+	// create thread to loop in alert_user function
+	pthread_t thread;
+	pthread_create(&thread, NULL, &alert_user, NULL);
 
   // clear out any previous temporary rules -- we don't have state for them anymore -- need to recreate them if we want them again
   //clean_config();
