@@ -315,7 +315,7 @@ int add_rule(struct nfq_data *tb, u_int32_t* verdict) {
   if (ret == 0) { // if success
     // pass the new rule to conductor
     LOGD("Alerting user");
-    alert_user();
+    alert_user(&new_rule);
   } else {
     LOGD("Could not write rule to the config file.");
   }
@@ -433,55 +433,7 @@ void print_icmp(struct icmphdr* i) {
 	LOGV("Rest of header:  0x%x", (unsigned int)i->un.gateway); // just grabbing any union field
 }
 
-void alert_user() {
-  int ret = 0;
-  FILE* fd;
-
-  struct curl_slist* headers = NULL;
-  char key_header[128]; // = "Authorization: key=AIzaSyCkzLOzVdzLj_FLh2Y2X2k4cKfRt0L8TsQ";
-  char target[256]; // = "fpD5nXntW30:APA91bHLzpJlld0XlmLeXZ1qssw1cm0w6FK5rAytZDkI8Bcb06ysVMCD8Gw_nhpoHEAT2H7DMBIz6OCd7D7RhGIZ3zU3CnbTZf0E7zf2rxjqKQZ0ES8kOp8vzQqg1S1Un-HwPkJHwLQE";
-
-  // get key_header
-  fd = fopen("/etc/config/gcm_auth_key","r");
-  if (fd == NULL) {
-    LOGW("Missing /etc/config/gcm_auth_key. Can't alert user of new rules.");
-    return;
-  }
-  fgets(key_header, sizeof(key_header), fd);
-  fclose(fd);
-  // get registration id
-  fd = fopen("/etc/config/gcm_reg_id","r");
-  if (fd == NULL) {
-    LOGW("Missing /etc/config/gcm_reg_id. Can't alert user of new rules.");
-    return;
-  }
-  fgets(target, sizeof(target), fd);
-  fclose(fd);
-
-
-  headers = curl_slist_append(headers,"Accept: application/json");
-  headers = curl_slist_append(headers,"Content-Type:application/json");
-  headers = curl_slist_append(headers,key_header);
-
-  char jsonObj[1024];
-  snprintf(jsonObj, sizeof(jsonObj), 
-      "{ \
-        \"data\": \
-        { \
-          \"title\" : \"Go to Router Interface\", \
-          \"message\" : \"You have new pending rules\", \
-        }, \
-        \"to\" : \"%s\" \
-      }", target);
-
-  LOGD("message: %s", jsonObj);
-  CURL *curl = curl_easy_init();
-  curl_easy_setopt(curl,CURLOPT_URL,"https://gcm-http.googleapis.com/gcm/send");
-  curl_easy_setopt(curl,CURLOPT_POSTFIELDS,jsonObj);
-  curl_easy_setopt(curl,CURLOPT_HTTPHEADER,headers);
-  ret = curl_easy_perform(curl);
-  LOGD("ret = %d", ret);
-  curl_easy_cleanup(curl);
+void alert_user(struct rule* r) {
 }
 
 int cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struct nfq_data *nfa, void *data)
