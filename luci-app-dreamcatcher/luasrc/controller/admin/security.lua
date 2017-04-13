@@ -723,7 +723,7 @@ function accept_rule_general()
 					local src_vlan_temp = x:get("dreamcatcher",IcName,"src_vlan")
 					local type_temp = x:get("dreamcatcher",IcName,"type")
 					local verdict_temp = x:get("dreamcatcher",IcName,"verdict")
-					if (src_vlan == src_vlan_temp and type == type_temp and verdict_temp == "ACCEPT") then
+					if (IcName ~= accept_rule and src_vlan == src_vlan_temp and type == type_temp and verdict_temp == "ACCEPT") then
 						found = true
 						-- combine this rule with that one
 						local device_names = x:get("dreamcatcher",IcName,"device_name") -- that one
@@ -732,18 +732,17 @@ function accept_rule_general()
 							table.insert(device_names, v) -- put all names in device_names
 						end
 						x:set("dreamcatcher",IcName,"device_name", device_names) -- store combined list in that one
-						x:delete("dreamcatcher",accept_rule) -- remove this one
-						x:commit("dreamcatcher")                                                                                                                                                                    
-						os.execute("/sbin/fw3 reload-dreamcatcher")                                                                                                                                                 
 					end
 				end
 			end)
-			if found == false then -- no existing ACCEPT rule, so approve and accept this one
+			if found == true then
+				x:delete("dreamcatcher",accept_rule) -- remove this one
+			else -- no existing ACCEPT rule, so approve and accept this one
 				x:set("dreamcatcher",accept_rule,"approved","1")                                                                                                                                            
 				x:set("dreamcatcher",accept_rule,"verdict","ACCEPT")                                                                                                                                        
-				x:commit("dreamcatcher")                                                                                                                                                                    
-				os.execute("/sbin/fw3 reload-dreamcatcher")                                                                                                                                                 
 			end
+			x:commit("dreamcatcher")                                                                                                                                                                    
+			os.execute("/sbin/fw3 reload-dreamcatcher")                                                                                                                                                 
 		end
 	end
 end
@@ -1266,7 +1265,7 @@ function general_perm_rule_table()
 					end
 					permanent_table = permanent_table                                           
 					.. '<td><form style="margin:0px;display: inline" id="' .. IcName .. "delete" .. '" action="" method="POST">'
-					.. '<input type="hidden" name="delete" value="' .. IcName .. '"></input>'                              
+					.. '<input type="hidden" name="delete" value="' .. IcName .. "-" .. k .. '"></input>'                              
 					.. '<input type="button" onclick="modify_rule(\'' .. IcName .. '\',\'delete\')" value="Delete"></input>'
 					.. '</form></td>'                                                                                      
 					permanent_table = permanent_table .. "</tr>" 
@@ -1475,12 +1474,45 @@ function general_temp_rule_table()
 	end
 end
 
+function split_dash(str)
+	fields = {}
+	for text in string.gmatch(str, "[^-]+") do
+		table.insert(fields, text)
+	end
+	if #fields < 2 then
+		fields[2] = ""
+	end
+	return fields[1], fields[2]
+end
+
 function delete_rule()
-	local delete_rule = http.formvalue("delete")
+	local delete_rule, device_idx = split_dash(http.formvalue("delete"))
 	local x=luci.model.uci.cursor()
-	if(x:delete("dreamcatcher",delete_rule)) then
-		x:commit("dreamcatcher")	
-		os.execute("/sbin/fw3 reload-dreamcatcher")
+	if device_idx == "" then -- normal case
+		if(x:delete("dreamcatcher",delete_rule)) then
+			x:commit("dreamcatcher")	
+			os.execute("/sbin/fw3 reload-dreamcatcher")
+		end
+	else -- we have a type 3 rule with a device index, remove that device only!
+		local device_names = x:get("dreamcatcher",delete_rule,"device_name")
+		if device_names == nil then -- weird, no devices for this rule -- ignore index and remove rule
+			if(x:delete("dreamcatcher",delete_rule)) then
+				x:commit("dreamcatcher")	
+				os.execute("/sbin/fw3 reload-dreamcatcher")
+			end
+		else -- we have a set of names -- remove the specified device index and commit
+			table.remove(device_names, device_idx)
+			if next(device_names) == nil then -- if table is now empty, just delete the whole rule
+				if(x:delete("dreamcatcher",delete_rule)) then
+					x:commit("dreamcatcher")	
+					os.execute("/sbin/fw3 reload-dreamcatcher")
+				end
+			else -- table still has some names, so commit the new one
+				x:set("dreamcatcher",delete_rule,"device_name",device_names)
+				x:commit("dreamcatcher")
+				os.execute("/sbin/fw3 reload-dreamcatcher")
+			end
+		end
 	end
 end
 
