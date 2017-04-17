@@ -1,5 +1,7 @@
+Index: linux-4.1.23/net/netfilter/xt_mdns.c
+===================================================================
 --- /dev/null
-+++ b/net/netfilter/xt_mdns.c
++++ linux-4.1.23/net/netfilter/xt_mdns.c
 @@ -0,0 +1,292 @@
 +#include <linux/string.h>
 +#include <linux/module.h>
@@ -293,8 +295,10 @@
 +MODULE_DESCRIPTION("Xtables extension: Match mDNS discovery or advertisement packets with specific names");
 +MODULE_LICENSE("GPLv3");
 +
---- a/net/netfilter/Makefile
-+++ b/net/netfilter/Makefile
+Index: linux-4.1.23/net/netfilter/Makefile
+===================================================================
+--- linux-4.1.23.orig/net/netfilter/Makefile
++++ linux-4.1.23/net/netfilter/Makefile
 @@ -172,6 +172,7 @@ obj-$(CONFIG_NETFILTER_XT_MATCH_STATISTI
  obj-$(CONFIG_NETFILTER_XT_MATCH_STRING) += xt_string.o
  obj-$(CONFIG_NETFILTER_XT_MATCH_TCPMSS) += xt_tcpmss.o
@@ -303,9 +307,11 @@
  obj-$(CONFIG_NETFILTER_XT_MATCH_U32) += xt_u32.o
  
  # ipset
+Index: linux-4.1.23/net/netfilter/dns.h
+===================================================================
 --- /dev/null
-+++ b/net/netfilter/dns.h
-@@ -0,0 +1,37 @@
++++ linux-4.1.23/net/netfilter/dns.h
+@@ -0,0 +1,34 @@
 +#ifndef DNS_H
 +#define DNS_H
 +
@@ -336,15 +342,14 @@
 +  PTR = 12, 
 +  TXT = 16, 
 +  AAAA = 28, 
-+  SRV = 33,
-+	//NSEC = 47
++  SRV = 33
 +} dns_type;
-+// note: these are only some of the dns types. A full listing can be found here:
-+// https://www.iana.org/assignments/dns-parameters/dns-parameters.xhtml#dns-parameters-4
 +
 +#endif // DNS_H
+Index: linux-4.1.23/net/netfilter/xt_mdns.h
+===================================================================
 --- /dev/null
-+++ b/net/netfilter/xt_mdns.h
++++ linux-4.1.23/net/netfilter/xt_mdns.h
 @@ -0,0 +1,28 @@
 +#ifndef _LINUX_NETFILTER_XT_MDNS_H
 +#define _LINUX_NETFILTER_XT_MDNS_H
@@ -374,8 +379,10 @@
 +unsigned char* skip_question(unsigned char* p);
 +
 +#endif // _LINUX_NETFILTER_XT_MDNS_H 
---- a/net/netfilter/Kconfig
-+++ b/net/netfilter/Kconfig
+Index: linux-4.1.23/net/netfilter/Kconfig
+===================================================================
+--- linux-4.1.23.orig/net/netfilter/Kconfig
++++ linux-4.1.23/net/netfilter/Kconfig
 @@ -1300,6 +1300,16 @@ config NETFILTER_XT_MATCH_PHYSDEV
  
  	  To compile it as a module, choose M here.  If unsure, say N.
