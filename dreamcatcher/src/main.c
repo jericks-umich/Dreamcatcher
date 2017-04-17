@@ -290,8 +290,14 @@ int add_rule(struct nfq_data *tb, u_int32_t* verdict) {
         dns = (dns_header*) data;
         //data = data + sizeof(*dns); // data now points at the start of questions variable-length field
         print_dns(dns);
+        if (dns->qr == 0) { // query
+          new_rule.type = DISCOVER;
+        } else { // answer
+          new_rule.type = ADVERTISE;
+        }
+        // NO LONGER NECESSARY -- mDNS rules are supported natively now -- type 2 and type 3 rules are simply written to config file
         // check against existing dpi_rule set for ALLOW/BLOCK verdict
-        return check_dpi_rule(&new_rule, dns, data, verdict);
+        //return check_dpi_rule(&new_rule, dns, data, verdict);
         // check_dpi_rule will create any new dpi_rules, as necessary, and return according to this functions return spec
           // verdict set in check_dpi_rule()
           // will either return -1 or 1, -1 if no new rule created, 1 if new rule created (in either case, no need to reload firewall rules)
@@ -307,11 +313,15 @@ int add_rule(struct nfq_data *tb, u_int32_t* verdict) {
       return -1; // don't add a new rule, but still block this packet
 	}
 
-  // we're not setting the message anymore
-  //set_message(&new_rule);
+  // set message for when rule is sent to user app
+  set_message(&new_rule);
 
   // write the rule to the config file
-  ret = write_rule(&new_rule);
+  if (new_rule.type == ADVERTISE) {
+    ret = write_rule_advertise(&new_rule, dns);
+  } else {
+    ret = write_rule(&new_rule);
+  }
   if (ret == 0) { // if success
     // pass the new rule to conductor
     LOGD("Alerting user");
@@ -320,9 +330,9 @@ int add_rule(struct nfq_data *tb, u_int32_t* verdict) {
     LOGD("Could not write rule to the config file.");
   }
   
-  if (ret == 0 && new_rule.type >= DISCOVER) { // if this is a dpi_rule, 
-    ret = 1; // don't reload firewall rules, since iptables doesn't handle dpi rules
-  }
+  //if (ret == 0 && new_rule.type >= DISCOVER) { // if this is a dpi_rule, 
+  //  ret = 1; // don't reload firewall rules, since iptables doesn't handle dpi rules
+  //}
 
 	return ret;
 }
@@ -433,7 +443,7 @@ void print_icmp(struct icmphdr* i) {
 	LOGV("Rest of header:  0x%x", (unsigned int)i->un.gateway); // just grabbing any union field
 }
 
-void alert_user(struct rule* r) {
+void alert_user(rule* r) {
 }
 
 int cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struct nfq_data *nfa, void *data)
@@ -450,7 +460,7 @@ int cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struct nfq_data *nfa, vo
   }
   print_pkt(nfa);
   ret = add_rule(nfa, &verdict); // may change verdict to NF_ACCEPT in some cases, otherwise default NF_DROP
-  if (ret == 0) { // if there is a new (non-dpi_)rule added
+  if (ret == 0) { // if there is a new rule added
     reload_firewall();
   }
   ret = nfq_set_verdict(qh, id, verdict, 0, NULL);

@@ -81,14 +81,16 @@ void hash_rule(rule* r) {
   // create string to be hashed
   // required
   snprintf(hash_string, sizeof(hash_string)-1, "%stype%d", hash_string, r->type);
-  if (r->src_vlan != 0) {
-    snprintf(hash_string, sizeof(hash_string)-1, "%ssrc_vlan%d", hash_string, r->src_vlan);
-  }
+  //if (r->src_vlan != 0) {
+  // required
+  snprintf(hash_string, sizeof(hash_string)-1, "%ssrc_vlan%d", hash_string, r->src_vlan);
+  //}
   if (r->dst_vlan != 0) {
     snprintf(hash_string, sizeof(hash_string)-1, "%sdst_vlan%d", hash_string, r->dst_vlan);
   }
-  // required
-  snprintf(hash_string, sizeof(hash_string)-1, "%sproto%s", hash_string, get_protocol_string(r->proto));
+  if (r->proto != 0) { // 0 is technically IP protocol, but we don't support IP protocol, so this is an okay check to see if proto is set
+    snprintf(hash_string, sizeof(hash_string)-1, "%sproto%s", hash_string, get_protocol_string(r->proto));
+  }
   if (strncmp(r->src_ip, "\0", IP_ADDR_LEN) != 0) {
     snprintf(hash_string, sizeof(hash_string)-1, "%ssrc_ip%s", hash_string, r->src_ip);
   }
@@ -121,6 +123,115 @@ void print_sections(struct uci_package* pkg) {
     LOGV("UCI section: %s", e->name);
   }
 }
+
+// input: the rule template to be written to config file, less device name
+// input: the device name to add to the rule. NOTE: this device name needs to be stripped of domain
+// return: 0 if rule was NOT added (probably because device name already exists), 1 if rule was added
+int make_advertise_rule(rule* r, unsigned char* dn) {
+  int ret;
+  char* dot;
+  // create new rule from template and add device name
+  rule new_rule;
+  memcpy((void*) &new_rule, (void*) r, sizeof(new_rule));
+  // add device_name to new_rule and strip domain drom device_name
+  strncpy(new_rule.device_name, dn, DEVICE_NAME_SIZE); // make copy so we can strip it safely
+  dot = strchr(new_rule.device_name, '.');
+  if (dot == NULL) { // if there was no '.' character, quit
+    LOGW("Malformed device name: \"%s\"", dn);
+    return 0;
+  }
+  *dot = '\0'; // effectively strip trailing parts of device name
+
+  // TODO: need to check all the existing advertisement rules to see if any of them contain this device name
+  // we're skipping this step right now because it's a corner case (albeit, one that can occur fairly easily) and we're short on time
+  // essentially, if we've accepted a rule with say, 3 device names, and then get a packet containing one of those device names and another device name not accepted (but not blocked)
+  // then we'll end up processing a packet here in Dreamcatcher with those two device names, and since we can't find the accepted device name via hash matching, we'll create two new rules
+  // then, we'll have an accept run and a block rule for the same device name. As long as the accept rule is above the reject rule, it'll work fine -- it's just ugly on the UI to have duplicates
+
+  ret = write_rule(&new_rule);
+  return (ret == 0);
+
+}
+
+// input: the rule to be written to config file, less device name(s)
+// input: the dns header containing device names
+// return: 0 on success, nonzero on failure
+int write_rule_advertise(rule* r, dns_header* dns) {
+  // if Dreamcatcher got this packet, it means that at least one of the names in the packet was NOT accepted and none of the names were REJECTed by another rule
+  // parse dns_header and iterate over all advertisement names (call make_advertise_rule())
+    // skip/filter all device names that are previously ACCEPTed
+    // create new rules to REJECT the names that aren't previously ACCEPTed
+  unsigned char* dns_raw = (unsigned char*) dns; // get raw byte stream we can use for parsing the payload
+  int i;
+  char buf[DEVICE_NAME_SIZE];
+  char temp_buf[DEVICE_NAME_SIZE]; // used only in PTR record
+  int name_length;
+  u_int16_t type;
+  u_int16_t data_len;
+  unsigned char* ptr = dns_raw + sizeof(*dns); // pointer to start of question/answer section in DNS packet
+  unsigned char* dot;
+	int num_rules = 0;
+
+  // skip over questions
+  for (i=0; i < dns->questions; i++) {
+    ptr = skip_question(ptr); // skips the question we're currently looking at
+  }
+  // after questions come Answer Resource Requests, which we want to match
+  // against the approved names in our info struct
+  for (i=0; i < dns->answer_rr + dns->authority_rr + dns->additional_rr; i++) { // iterate over the answers
+    name_length = read_dns_name(dns_raw, ptr, buf); // put name in buf
+    ptr += name_length; // move ptr forward to type section
+    type = ntohs(*(u_int16_t*)ptr); // translate from network byte order to host byte order
+    ptr += 8; // move ptr past the TYPE (2 bytes), CLASS (2 bytes), and TTL (4 bytes) fields
+    data_len = ntohs(*(u_int16_t*)ptr); // translate from network byte order to host byte order
+    ptr += 2; // move ptr past the RDLENGTH field
+    // if type is A, AAAA, SRV, TXT, use response from read_dns_name as device name
+    // if type is PTR, SRV, read the RDATA field for the device name (or 2nd device name in case of SRV)
+    // special case for PTR records, if name starts with _services._dns-sd.*, we check domain for _<proto>._<proto>.*, and if so, completely ignore this answer
+    switch (type) {
+      case A :
+      case TXT :
+      case AAAA :
+        num_rules += make_advertise_rule(r, buf);
+        break;
+      case PTR :
+#define SERVICES_STR "_services._dns-sd." 
+				if (strncmp(buf, SERVICES_STR, sizeof(SERVICES_STR)-1) == 0) { // if name matches services prefix, check for special case
+					read_dns_name(dns_raw, ptr, buf);
+					// check that first two segments of domain start with underscores, as the spec (https://tools.ietf.org/html/rfc6763#section-9) says they should
+					dot = strchr(buf, '.'); // find first dot in domain name
+					if (buf[0] == '_' && dot != NULL && dot[1] == '_') {
+						break; // don't check this device name
+					} else { // weird, name matches services prefix, but domain doesn't conform
+            num_rules += make_advertise_rule(r, buf);
+						break; 
+					}
+					break;
+				}
+        // if we get here, then this is a normal PTR record, not one starting with _services._dns-sd
+        read_dns_name(dns_raw, ptr, buf);
+        num_rules += make_advertise_rule(r, buf);
+        break;
+      case SRV :
+        // check first device name from above
+        num_rules += make_advertise_rule(r, buf);
+        // check second device name as target field
+        read_dns_name(dns_raw, ptr+6, buf); // first 6 bytes are priority, weight, port
+        // http://www.tahi.org/dns/packages/RFC2782_S4-1_0_0/SV/SV_RFC2782_SRV_rdata.html
+        num_rules += make_advertise_rule(r, buf);
+        break;
+      default :
+        LOGW("Unsupported DNS answer type: %u", type);
+        return false;
+    }
+    ptr += data_len; // move p past RDATA field, ready for next iteration
+  }
+
+  // if we've parsed the packet and created at least one new rule, then return 0, else return 1
+  return (num_rules == 0);
+
+}
+
   
 // input: the rule to be written to config file
 // return: 0 on success, nonzero on failure
@@ -185,13 +296,9 @@ int write_rule(rule* r) {
   }
 
   // create new entry/section
-  if (r->type >= DISCOVER) { // if a dpi_rule
-    add_new_named_rule_section(ctx, r->hash, 1); // dpi == true
-  } else {
-    add_new_named_rule_section(ctx, r->hash, 0); // dpi == false
-  }
+  add_new_named_rule_section(ctx, r->hash);
   // populate section
-  rule_uci_set_str(ctx, r->hash, "message", r->message); // required
+  //rule_uci_set_str(ctx, r->hash, "message", r->message); // required
   rule_uci_set_int(ctx, r->hash, "type", r->type); // required
   if (r->src_vlan != 0) { // optional
     rule_uci_set_int(ctx, r->hash, "src_vlan", r->src_vlan);
@@ -259,14 +366,10 @@ int rule_exists(struct uci_context* ctx, const char* hash) {
   return (ptr.s != NULL); // true if the target exists (ptr.s having a value means there's a pointer to an actual section struct)
 }
 
-void add_new_named_rule_section(struct uci_context* ctx, const char* hash, int dpi_rule) {
+void add_new_named_rule_section(struct uci_context* ctx, const char* hash) {
   struct uci_ptr ptr;
   char ptr_string[128];
-  if (dpi_rule) {
-    snprintf(ptr_string, sizeof(ptr_string), "dreamcatcher.%s=dpi_rule", hash);
-  } else {
-    snprintf(ptr_string, sizeof(ptr_string), "dreamcatcher.%s=rule", hash);
-  }
+  snprintf(ptr_string, sizeof(ptr_string), "dreamcatcher.%s=rule", hash);
   uci_lookup_ptr(ctx, &ptr, ptr_string, false);
   uci_set(ctx, &ptr);
 }
@@ -289,13 +392,12 @@ void rule_uci_set_str(struct uci_context *ctx, const char* hash, const char* opt
 
 // reads from ptr the dns name using dns's weird encoding
 // uses payload in case ptr refers to a location of a previous substring
-// TODO: support this ^^^
-// if not NULL, buf is filled with the resulting string
-// returns the length read, in bytes
-// NOTE: make sure this is the start of a question section, because this function cannot tell and will behave erratically if not
+// if not passed in as NULL, buf is filled with the resulting string
+// returns the length read, in bytes (Note: if we hit a pointer, it returns the number of bytes from the start to the end of the pointer, not the length of the name returned)
+// NOTE: make sure this is the start of a name section, because this function cannot tell and will behave erratically if not
 // NOTE: This ONLY reads the name until it gets to a null byte. It does not include, for instance, the 4 bytes for QTYPE/QCLASS fields in a question
 unsigned int read_dns_name(unsigned char* payload, unsigned char* start, char* buf) {
-  int num_bytes = 0; // return value; can be set at any time if we hit a reference, or if we get to end, will be set
+  int num_bytes = 0; // return value; can be set at any time if we hit a reference, or if we get to end, will be set 
   unsigned char* ptr = start;
   u_int16_t offset; // offset into payload; used when we have a pointer
   if (buf != NULL) {
@@ -303,24 +405,24 @@ unsigned int read_dns_name(unsigned char* payload, unsigned char* start, char* b
   }
   // iterate until we reach a null byte
   while (*ptr != 0) {
-    // check if next segment is a reference
+    // check if next segment is a reference 
     if ((*ptr & 192) == 192) { // it's a pointer if first two bits are set 0b11000000
       // pointer is two bytes, network order
       offset = ntohs(*(u_int16_t*)ptr); // get offset (including flag bits)
       offset &= 16383; // mask off flag bits (mask == 0b0011111111111111)
       if (num_bytes == 0) { // if num_bytes isn't set yet, aka this is the first pointer
         num_bytes = (ptr+2) - start; // how many bytes has ptr gone?
-      }
+      }   
       ptr = payload + offset; // set ptr to next segment
     } else { // not a pointer, so add next segment
-      if (buf != NULL) {
+      if (buf != NULL) { 
         snprintf(buf, DEVICE_NAME_SIZE, "%s%.*s", buf, *ptr, (ptr+1)); // append next segment of device name
       }
-      ptr += ((*ptr) + 1); // ptr points at the number of characters in this segment of the name, so move it to the end of the segment
+      ptr += ((*ptr) + 1); // ptr points at the number of characters in this segment of the name, so move it to the end of the segment 
       if (buf != NULL && *ptr != 0) { // if we're going to add another segment
         snprintf(buf, DEVICE_NAME_SIZE, "%s.", buf); // append a '.' character between segments
-      }
-    }
+      } 
+    }   
   }
   if (num_bytes == 0) { // if num_chars hasn't been set yet, aka there were no pointers in this name
     // when ptr == '\0' to end the string, we need to move 1 byte more to get past it
@@ -429,129 +531,129 @@ void free_names(char** names) {
 // returns 1 if we create any new dpi_rules, -1 if we do not (returning 0 reloads the firewall, which we do not want to do)
 // sets verdict to NF_ACCEPT if all applicable existing rules specify ACCEPT target
 // sets rule.device_name for each device name (may create/check multiple rules) if a new ADVERTISE rule needs to be made
-int check_dpi_rule(rule* r, dns_header* dns, unsigned char* payload, u_int32_t* verdict) {
-  int fd;
-  int ret = -1; // default if we don't create any new rules
-  int load_ret;
-  int lock_ret;
-  int parse_ret;
-  int exists_ret;
-  int create_ret;
-  int tries = 0;
-  u_int32_t flag = 1; // gets set to 0 if packet should be blocked
-  u_int32_t temp_verdict;
-  char buf[DEVICE_NAME_SIZE];
-
-  // Allocate names struct
-  char** names = calloc(sizeof(char*), (dns->answer_rr*2)+1); // array of char*'s (individual char*'s will be allocated later). the +1 is so we are guaranteed to have a null pointer at the end
-
-  struct uci_context* ctx;
-  struct uci_package* pkg;
-  struct uci_element* e;
-
-  if (dns->qr == 1) { // only the ADVERTISE rules should have the device name included in the rule
-    r->type = ADVERTISE;
-    LOGV("DNS Response packet, parsing answers");
-    parse_ret = parse_dns_answers(dns, payload, (char**) names); // populates names with names for new rules, some names will be empty
-    if (parse_ret == -1) {
-      free_names(names);
-      return -1;
-    }
-  } else if (dns->qr == 0) { // if it's a discover packet
-    r->type = DISCOVER;
-    read_dns_name(payload, payload + sizeof(*dns), buf); // log the question name, just because I'm curious
-    LOGV("This dns packet refers to %s", buf);
-  }
-
-  // lock the config file
-  LOGV("Locking config file");
-  fd = -1;
-  for (tries = 0; fd == -1 && tries < MAX_TRIES; tries++) {
-    fd = lock_open_config();
-  }
-  if (fd == -1) {
-    LOGE("Could not open or lock config file.");
-    free_names(names);
-    return 1; // not sure what to do here, for now just say the rule exists (default block) and do nothing
-  }
-
-  // initialize uci context for dreamcatcher file
-  LOGV("Initializing config file context");
-  ctx = uci_alloc_context();
-  if (!ctx) {
-    LOGW("Didn't properly initialize context");
-  }
-  load_ret = uci_load(ctx, "dreamcatcher", &pkg); // config file loaded into pkg
-  if (load_ret != UCI_OK) {
-    LOGW("Didn't properly load config file");
-    uci_perror(ctx,""); // TODO: replace this with uci_get_errorstr() and use our own logging functions
-  }
-
-  LOGV("Checking existing DPI rules to see if they match this packet.");
-  if (r->type == DISCOVER) {
-    // (re)calculate hash of rule
-    hash_rule(r); // now r->hash stores the unique id for this rule
-    exists_ret = dpi_rule_exists(ctx, r->hash, verdict); // verdict is set if rule is found
-    LOGV("Rule already exists: %d", exists_ret);
-    if (exists_ret == 0) { // if rule doesn't exist yet
-      // create new rule
-      create_ret = write_rule(r);
-      if (create_ret == 0) {
-        LOGD("Alerting user");
-        alert_user();
-        ret = 1;
-      } else {
-        LOGV("Did not write rule to the config file.");
-      }
-    }
-  } else if (r->type == ADVERTISE) {
-    // iterate over all the device names, check if their rules ALL exist AND say ACCEPT
-    for (int i = 0; names[i] != NULL; i++) { // iterate over our list of names
-      strncpy(r->device_name, names[i], DEVICE_NAME_SIZE); // set device name to this name
-      LOGV("Checking if rule exists for device name %s", r->device_name);
-      // (re)calculate hash of rule
-      hash_rule(r); // now r->hash stores the unique id for this rule
-      // check if this rule exists
-      if (dpi_rule_exists(ctx, r->hash, &temp_verdict)) { // verdict is set if rule is found
-        LOGV("Device %s exists", r->device_name);
-        if (temp_verdict != NF_ACCEPT) { // if not all of the existing rules say ACCEPT
-          flag = 0;
-        }
-      } else { // rule does not already exist
-        LOGV("Device %s does not exist", r->device_name);
-        flag = 0; // we need to create at least one new rule because of this packet, so it should be blocked
-        // create new rule
-        create_ret = write_rule(r);
-        if (create_ret == 0) {
-          LOGD("Alerting user");
-          alert_user();
-          ret = 1;
-        } else {
-          LOGV("Did not write rule to the config file.");
-        }
-      }
-    }
-    if (flag == 1) { // if we never set flag to 0
-      LOGV("All devices existed in the dpi_rules and had ACCEPT rules, so we can ACCEPT this packet! Yay!");
-      *verdict = NF_ACCEPT; // then we can accept the packet! yay!
-    }
-  }
-
-  // unlock the config file
-  LOGV("Unlocking config file");
-  lock_ret = -1;
-  for (tries = 0; lock_ret == -1 && tries < MAX_TRIES; tries++) {
-    lock_ret = unlock_close_config(fd);
-  }
-  if (lock_ret == -1) {
-    LOGE("Could not unlock or close config file.");
-    free_names(names);
-    return 1; // not sure what to do here, for now just say the rule exists (default block) and do nothing
-  }
-
-  free_names(names);
-  return ret;
-}
+//int check_dpi_rule(rule* r, dns_header* dns, unsigned char* payload, u_int32_t* verdict) {
+//  int fd;
+//  int ret = -1; // default if we don't create any new rules
+//  int load_ret;
+//  int lock_ret;
+//  int parse_ret;
+//  int exists_ret;
+//  int create_ret;
+//  int tries = 0;
+//  u_int32_t flag = 1; // gets set to 0 if packet should be blocked
+//  u_int32_t temp_verdict;
+//  char buf[DEVICE_NAME_SIZE];
+//
+//  // Allocate names struct
+//  char** names = calloc(sizeof(char*), (dns->answer_rr*2)+1); // array of char*'s (individual char*'s will be allocated later). the +1 is so we are guaranteed to have a null pointer at the end
+//
+//  struct uci_context* ctx;
+//  struct uci_package* pkg;
+//  struct uci_element* e;
+//
+//  if (dns->qr == 1) { // only the ADVERTISE rules should have the device name included in the rule
+//    r->type = ADVERTISE;
+//    LOGV("DNS Response packet, parsing answers");
+//    parse_ret = parse_dns_answers(dns, payload, (char**) names); // populates names with names for new rules, some names will be empty
+//    if (parse_ret == -1) {
+//      free_names(names);
+//      return -1;
+//    }
+//  } else if (dns->qr == 0) { // if it's a discover packet
+//    r->type = DISCOVER;
+//    read_dns_name(payload, payload + sizeof(*dns), buf); // log the question name, just because I'm curious
+//    LOGV("This dns packet refers to %s", buf);
+//  }
+//
+//  // lock the config file
+//  LOGV("Locking config file");
+//  fd = -1;
+//  for (tries = 0; fd == -1 && tries < MAX_TRIES; tries++) {
+//    fd = lock_open_config();
+//  }
+//  if (fd == -1) {
+//    LOGE("Could not open or lock config file.");
+//    free_names(names);
+//    return 1; // not sure what to do here, for now just say the rule exists (default block) and do nothing
+//  }
+//
+//  // initialize uci context for dreamcatcher file
+//  LOGV("Initializing config file context");
+//  ctx = uci_alloc_context();
+//  if (!ctx) {
+//    LOGW("Didn't properly initialize context");
+//  }
+//  load_ret = uci_load(ctx, "dreamcatcher", &pkg); // config file loaded into pkg
+//  if (load_ret != UCI_OK) {
+//    LOGW("Didn't properly load config file");
+//    uci_perror(ctx,""); // TODO: replace this with uci_get_errorstr() and use our own logging functions
+//  }
+//
+//  LOGV("Checking existing DPI rules to see if they match this packet.");
+//  if (r->type == DISCOVER) {
+//    // (re)calculate hash of rule
+//    hash_rule(r); // now r->hash stores the unique id for this rule
+//    exists_ret = dpi_rule_exists(ctx, r->hash, verdict); // verdict is set if rule is found
+//    LOGV("Rule already exists: %d", exists_ret);
+//    if (exists_ret == 0) { // if rule doesn't exist yet
+//      // create new rule
+//      create_ret = write_rule(r);
+//      if (create_ret == 0) {
+//        LOGD("Alerting user");
+//        alert_user();
+//        ret = 1;
+//      } else {
+//        LOGV("Did not write rule to the config file.");
+//      }
+//    }
+//  } else if (r->type == ADVERTISE) {
+//    // iterate over all the device names, check if their rules ALL exist AND say ACCEPT
+//    for (int i = 0; names[i] != NULL; i++) { // iterate over our list of names
+//      strncpy(r->device_name, names[i], DEVICE_NAME_SIZE); // set device name to this name
+//      LOGV("Checking if rule exists for device name %s", r->device_name);
+//      // (re)calculate hash of rule
+//      hash_rule(r); // now r->hash stores the unique id for this rule
+//      // check if this rule exists
+//      if (dpi_rule_exists(ctx, r->hash, &temp_verdict)) { // verdict is set if rule is found
+//        LOGV("Device %s exists", r->device_name);
+//        if (temp_verdict != NF_ACCEPT) { // if not all of the existing rules say ACCEPT
+//          flag = 0;
+//        }
+//      } else { // rule does not already exist
+//        LOGV("Device %s does not exist", r->device_name);
+//        flag = 0; // we need to create at least one new rule because of this packet, so it should be blocked
+//        // create new rule
+//        create_ret = write_rule(r);
+//        if (create_ret == 0) {
+//          LOGD("Alerting user");
+//          alert_user();
+//          ret = 1;
+//        } else {
+//          LOGV("Did not write rule to the config file.");
+//        }
+//      }
+//    }
+//    if (flag == 1) { // if we never set flag to 0
+//      LOGV("All devices existed in the dpi_rules and had ACCEPT rules, so we can ACCEPT this packet! Yay!");
+//      *verdict = NF_ACCEPT; // then we can accept the packet! yay!
+//    }
+//  }
+//
+//  // unlock the config file
+//  LOGV("Unlocking config file");
+//  lock_ret = -1;
+//  for (tries = 0; lock_ret == -1 && tries < MAX_TRIES; tries++) {
+//    lock_ret = unlock_close_config(fd);
+//  }
+//  if (lock_ret == -1) {
+//    LOGE("Could not unlock or close config file.");
+//    free_names(names);
+//    return 1; // not sure what to do here, for now just say the rule exists (default block) and do nothing
+//  }
+//
+//  free_names(names);
+//  return ret;
+//}
 
 // returns 1 if exists, 0 if not
 // if rule exists, sets verdict

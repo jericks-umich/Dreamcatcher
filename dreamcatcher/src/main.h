@@ -13,6 +13,7 @@
 #include <netinet/ip_icmp.h>
 
 #include <protocols.h>
+#include <config.h>
 #include <dns.h>
 
 #define QUEUE_NUM 4670
@@ -31,7 +32,7 @@ void reload_firewall();
 void print_tcp(struct tcphdr* t);
 void print_udp(struct udphdr* u);
 void print_icmp(struct icmphdr* i);
-void alert_user(struct rule* r);
+void alert_user(rule* r);
 int cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struct nfq_data *nfa, void *data);
 int main(int argc, char **argv);
 

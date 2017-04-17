@@ -79,10 +79,13 @@ char* get_verdict_string(verdict v);
 void hash_rule(rule* r);
 void print_uci_ptr(struct uci_ptr* p);
 void print_sections(struct uci_package* pkg);
+
+int make_advertise_rule(rule* r, unsigned char* dn);
 int write_rule(rule* r);
+int write_rule_advertise(rule* r, dns_header* dns);
 
 int rule_exists(struct uci_context* ctx, const char* hash);
-void add_new_named_rule_section(struct uci_context* ctx, const char* hash, int dpi_rule);
+void add_new_named_rule_section(struct uci_context* ctx, const char* hash);
 void rule_uci_set_int(struct uci_context* ctx, const char* hash, const char* option, const unsigned int value);
 void rule_uci_set_str(struct uci_context* ctx, const char* hash, const char* option, const char* value);
 

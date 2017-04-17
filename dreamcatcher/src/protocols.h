@@ -1,6 +1,8 @@
 #ifndef DREAMCATCHER_PROTOCOLS_H
 #define DREAMCATCHER_PROTOCOLS_H
 
+#define MAX_PROTO_LEN 16
+
 typedef enum {
   IP  = 0,                // IP    // internet protocol, pseudo protocol number
   HOPOPT  = 0,            // HOPOPT    // IPv6 Hop-by-Hop Option [RFC1883]
