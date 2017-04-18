@@ -132,7 +132,7 @@ void print_ipv6(struct ip6_hdr* i)
 unsigned int get_src_vlan(struct nfq_data *tb) {
   struct nlif_handle* h;
   char ifname_buf[16]; // IFNAMSIZ from linux kernel is 16
-  char* vlan_ptr;
+  char* dot;
   h = nlif_open();
   if (h == NULL) {
     LOGW("nlif_open failed.");
@@ -142,16 +142,18 @@ unsigned int get_src_vlan(struct nfq_data *tb) {
 	nfq_get_physindev_name(h, tb, ifname_buf);
   nlif_close(h);
   LOGV("indev name: %s", ifname_buf);
-  strtok(ifname_buf, "."); // throw away the first pointer pointing to "wlanX" or another network prefix
-  vlan_ptr = strtok(NULL, "."); // vlan_ptr points to the vlan id now
-  LOGV("Attempting to convert string \"%s\" to integer", vlan_ptr);
-  return (unsigned int) strtol(vlan_ptr, NULL, 10); // returns 0 if unable to convert to integer
+  dot = strchr(ifname_buf, '.');
+  if (dot == NULL) {
+    return 0;
+  }
+  LOGV("Attempting to convert string \"%s\" to integer", dot+1);
+  return (unsigned int) strtol(dot+1, NULL, 10); // returns 0 if unable to convert to integer
 }
 
 unsigned int get_dst_vlan(struct nfq_data *tb) {
   struct nlif_handle* h;
   char ifname_buf[16]; // IFNAMSIZ from linux kernel is 16
-  char* vlan_ptr;
+  char* dot;
   h = nlif_open();
   if (h == NULL) {
     LOGW("nlif_open failed.");
@@ -161,10 +163,12 @@ unsigned int get_dst_vlan(struct nfq_data *tb) {
 	nfq_get_physoutdev_name(h, tb, ifname_buf);
   nlif_close(h);
   LOGV("outdev name: %s", ifname_buf);
-  strtok(ifname_buf, "."); // throw away the first pointer pointing to "wlanX" or another network prefix
-  vlan_ptr = strtok(NULL, "."); // vlan_ptr points to the vlan id now
-  LOGV("Attempting to convert string \"%s\" to integer", vlan_ptr);
-  return (unsigned int) strtol(vlan_ptr, NULL, 10); // returns 0 if unable to convert to integer
+  dot = strchr(ifname_buf, '.');
+  if (dot == NULL) {
+    return 0;
+  }
+  LOGV("Attempting to convert string \"%s\" to integer", dot+1);
+  return (unsigned int) strtol(dot+1, NULL, 10); // returns 0 if unable to convert to integer
 }
 
 void print_dns(dns_header* d) {
