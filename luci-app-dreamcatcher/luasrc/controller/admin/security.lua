@@ -102,13 +102,13 @@ function Verdict_1()
 				.. "<td style=\"text-align:center\">"                               
 				.. '<form style="margin:0px;display:inline" id="' .. id .. "accept" .. '" action="rule/rules_1" method="POST">'
 				.. '<input type="hidden" name="accept" value="' .. id .. '"></input>'                                          
-				.. '<input type="button" onclick="modify_rule(\'' .. id .. '\',\'accept\')" value="Accept"></input>'           
+				.. '<input type="submit" value="Accept"></input>'           
 				.. '</form>'                                                                                                   
 				.. "</td>"                                                                                                     
 				.. "<td style=\"text-align:center\">"                                                                          
 				.. '<form style="margin:0px;display:inline" id="' .. id .. "reject" .. '" action="rule/rules_1" method="POST">'
 				.. '<input type="hidden" name="reject" value="' .. id .. '"></input>'                                          
-				.. '<input type="button" onclick="modify_rule(\'' .. id .. '\',\'reject\')" value="Reject"></input>'           
+				.. '<input type="submit" value="Reject"></input>'           
 				.. '</form>'                                                                                                   
 				.. "</td>"                                                                                                     
 				.. "</tr>"                                                                                                     
@@ -168,13 +168,13 @@ function Verdict_2()
 				.. "<td style=\"text-align:center\">"                                                                                                                                                   
 				.. '<form style="margin:0px;display:inline" id="' .. id .. "accept" .. '" action="rule/rules_2" method="POST">'                                                                     
 				.. '<input type="hidden" name="accept" value="' .. id .. '"></input>'                                                                                                   
-				.. '<input type="button" onclick="modify_rule(\'' .. id .. '\',\'accept\')" value="Accept"></input>'                                                                    
+				.. '<input type="submit" value="Accept"></input>'                                                                    
 				.. '</form>'
 				.. "</td>"
 				.. "<td style=\"text-align:center\">"                                                                                                                                                                
 				.. '<form style="margin:0px;display:inline" id="' .. id .. "reject" .. '" action="rule/rules_2" method="POST">'                                                                     
 				.. '<input type="hidden" name="reject" value="' .. id .. '"></input>'                                                                                                   
-				.. '<input type="button" onclick="modify_rule(\'' .. id .. '\',\'reject\')" value="Reject"></input>'                                                                    
+				.. '<input type="submit" value="Reject"></input>'                                                                    
 				.. '</form>'
 				.. "</td>"
 				.. "</tr>"
@@ -322,7 +322,7 @@ function unauth_perm_rule_table(vlan)
 						permanent_table = permanent_table                                           
 						.. '<td><form style="margin:0px;display: inline" id="' .. IcName .. "delete" .. '" action="" method="POST">'
 						.. '<input type="hidden" name="delete" value="' .. IcName .. '"></input>'                              
-						.. '<input type="button" onclick="modify_rule(\'' .. IcName .. '\',\'delete\')" value="Delete"></input>'
+						.. '<input type="submit" value="Delete"></input>'
 						.. '</form></td>'                                                                                      
 						permanent_table = permanent_table .. "</tr>" 
 					end
@@ -339,7 +339,7 @@ function unauth_perm_rule_table(vlan)
 					permanent_table = permanent_table                                           
 					.. '<td><form style="margin:0px;display: inline" id="' .. IcName .. "delete" .. '" action="" method="POST">'
 					.. '<input type="hidden" name="delete" value="' .. IcName .. '"></input>'                              
-					.. '<input type="button" onclick="modify_rule(\'' .. IcName .. '\',\'delete\')" value="Delete"></input>'
+					.. '<input type="submit" value="Delete"></input>'
 					.. '</form></td>'                                                                                      
 					permanent_table = permanent_table .. "</tr>" 
 				end
@@ -449,15 +449,15 @@ function unauth_temp_rule_table(vlan)
 						temp_table = temp_table .. "<td>"                                                                              
 						.. '<form style="margin:0px;display:inline" id="' .. IcName .. "accept" .. '" action="" method="POST">'
 						.. '<input type="hidden" name="accept" value="' .. IcName .. '"></input>'                              
-						.. '<input type="button" onclick="modify_rule(\'' .. IcName .. '\',\'accept\')" value="Accept"></input>'
+						.. '<input type="submit" value="Accept"></input>'
 						.. '</form>'                                                                                           
 						.. '<form style="margin:0px;display:inline" id="' .. IcName .. "reject" .. '" action="" method="POST">'
 						.. '<input type="hidden" name="reject" value="' .. IcName .. '"></input>'                              
-						.. '<input type="button" onclick="modify_rule(\'' .. IcName .. '\',\'reject\')" value="Reject"></input>'
+						.. '<input type="submit" value="Reject"></input>'
 						.. '</form>'                                                                                           
 						.. '<form style="margin:0px;display:inline" id="' .. IcName .. "delete" .. '" action="" method="POST">'
 						.. '<input type="hidden" name="delete" value="' .. IcName .. '"></input>'                              
-						.. '<input type="button" onclick="modify_rule(\'' .. IcName .. '\',\'delete\')" value="Delete"></input>'
+						.. '<input type="submit" value="Delete"></input>'
 						.. '</form></td>'                                                                                      
 						temp_table = temp_table .. "</tr>"
 					end
@@ -468,15 +468,15 @@ function unauth_temp_rule_table(vlan)
 					temp_table = temp_table .. "<td>"                                                                              
 					.. '<form style="margin:0px;display:inline" id="' .. IcName .. "accept" .. '" action="" method="POST">'
 					.. '<input type="hidden" name="accept" value="' .. IcName .. '"></input>'                              
-					.. '<input type="button" onclick="modify_rule(\'' .. IcName .. '\',\'accept\')" value="Accept"></input>'
+					.. '<input type="submit" value="Accept"></input>'
 					.. '</form>'                                                                                           
 					.. '<form style="margin:0px;display:inline" id="' .. IcName .. "reject" .. '" action="" method="POST">'
 					.. '<input type="hidden" name="reject" value="' .. IcName .. '"></input>'                              
-					.. '<input type="button" onclick="modify_rule(\'' .. IcName .. '\',\'reject\')" value="Reject"></input>'
+					.. '<input type="submit" value="Reject"></input>'
 					.. '</form>'                                                                                           
 					.. '<form style="margin:0px;display:inline" id="' .. IcName .. "delete" .. '" action="" method="POST">'
 					.. '<input type="hidden" name="delete" value="' .. IcName .. '"></input>'                              
-					.. '<input type="button" onclick="modify_rule(\'' .. IcName .. '\',\'delete\')" value="Delete"></input>'
+					.. '<input type="submit" value="Delete"></input>'
 					.. '</form></td>'                                                                                      
 					temp_table = temp_table .. "</tr>"
 				end
@@ -956,7 +956,7 @@ function advanced_perm_rule_table()
 			permanent_table = permanent_table 
 			.. '<td><form style="margin:0px;display: inline" id="' .. IcName .. "delete" .. '" action="" method="POST">'
 			.. '<input type="hidden" name="delete" value="' .. IcName .. '"></input>'   
-			.. '<input type="button" onclick="modify_rule(\'' .. IcName .. '\',\'delete\')" value="Delete"></input>'
+			.. '<input type="submit" value="Delete"></input>'
 			.. '</form></td>'
 			permanent_table = permanent_table .. "</tr>"
 		end
@@ -1030,7 +1030,7 @@ function advanced_perm_rule_table()
 			permanent_table = permanent_table 
 			.. '<td><form style="margin:0px;display: inline" id="' .. IcName .. "delete" .. '" action="" method="POST">'
 			.. '<input type="hidden" name="delete" value="' .. IcName .. '"></input>'   
-			.. '<input type="button" onclick="modify_rule(\'' .. IcName .. '\',\'delete\')" value="Delete"></input>'
+			.. '<input type="submit" value="Delete"></input>'
 			.. '</form></td>'
 			permanent_table = permanent_table .. "</tr>"
 		end
@@ -1119,15 +1119,15 @@ function advanced_temp_rule_table()
 			temp_table = temp_table .. "<td>" 
 			.. '<form style="margin:0px;display:inline" id="' .. IcName .. "accept" .. '" action="" method="POST">'                    
 			.. '<input type="hidden" name="accept" value="' .. IcName .. '"></input>'                              
-			.. '<input type="button" onclick="modify_rule(\'' .. IcName .. '\',\'accept\')" value="Accept"></input>'          
+			.. '<input type="submit" value="Accept"></input>'          
 			.. '</form>'
 			.. '<form style="margin:0px;display:inline" id="' .. IcName .. "reject" .. '" action="" method="POST">'                    
 			.. '<input type="hidden" name="reject" value="' .. IcName .. '"></input>'                              
-			.. '<input type="button" onclick="modify_rule(\'' .. IcName .. '\',\'reject\')" value="Reject"></input>'          
+			.. '<input type="submit" value="Reject"></input>'          
 			.. '</form>'
 			.. '<form style="margin:0px;display:inline" id="' .. IcName .. "delete" .. '" action="" method="POST">'
 			.. '<input type="hidden" name="delete" value="' .. IcName .. '"></input>' 
-			.. '<input type="button" onclick="modify_rule(\'' .. IcName .. '\',\'delete\')" value="Delete"></input>' 
+			.. '<input type="submit" value="Delete"></input>' 
 			.. '</form></td>'
 			temp_table = temp_table .. "</tr>" 
 		end                                                                          
@@ -1195,15 +1195,15 @@ function advanced_temp_rule_table()
 			temp_table = temp_table .. "<td>" 
 			.. '<form style="margin:0px;display:inline" id="' .. IcName .. "accept" .. '" action="" method="POST">'                    
 			.. '<input type="hidden" name="accept" value="' .. IcName .. '"></input>'                              
-			.. '<input type="button" onclick="modify_rule(\'' .. IcName .. '\',\'accept\')" value="Accept"></input>'          
+			.. '<input type="submit" value="Accept"></input>'          
 			.. '</form>'
 			.. '<form style="margin:0px;display:inline" id="' .. IcName .. "reject" .. '" action="" method="POST">'                    
 			.. '<input type="hidden" name="reject" value="' .. IcName .. '"></input>'                              
-			.. '<input type="button" onclick="modify_rule(\'' .. IcName .. '\',\'reject\')" value="Reject"></input>'          
+			.. '<input type="submit" value="Reject"></input>'          
 			.. '</form>'
 			.. '<form style="margin:0px;display:inline" id="' .. IcName .. "delete" .. '" action="" method="POST">'
 			.. '<input type="hidden" name="delete" value="' .. IcName .. '"></input>' 
-			.. '<input type="button" onclick="modify_rule(\'' .. IcName .. '\',\'delete\')" value="Delete"></input>' 
+			.. '<input type="submit" value="Delete"></input>' 
 			.. '</form></td>'
 			temp_table = temp_table .. "</tr>" 
 		end                                                                          
@@ -1266,7 +1266,7 @@ function general_perm_rule_table()
 					permanent_table = permanent_table                                           
 					.. '<td><form style="margin:0px;display: inline" id="' .. IcName .. "delete" .. '" action="" method="POST">'
 					.. '<input type="hidden" name="delete" value="' .. IcName .. "-" .. k .. '"></input>'                              
-					.. '<input type="button" onclick="modify_rule(\'' .. IcName .. '\',\'delete\')" value="Delete"></input>'
+					.. '<input type="submit" value="Delete"></input>'
 					.. '</form></td>'                                                                                      
 					permanent_table = permanent_table .. "</tr>" 
 				end
@@ -1283,7 +1283,7 @@ function general_perm_rule_table()
 				permanent_table = permanent_table                                           
 				.. '<td><form style="margin:0px;display: inline" id="' .. IcName .. "delete" .. '" action="" method="POST">'
 				.. '<input type="hidden" name="delete" value="' .. IcName .. '"></input>'                              
-				.. '<input type="button" onclick="modify_rule(\'' .. IcName .. '\',\'delete\')" value="Delete"></input>'
+				.. '<input type="submit" value="Delete"></input>'
 				.. '</form></td>'                                                                                      
 				permanent_table = permanent_table .. "</tr>" 
 			end
@@ -1388,15 +1388,15 @@ function general_temp_rule_table()
 					temp_table = temp_table .. "<td>"                                                                              
 					.. '<form style="margin:0px;display:inline" id="' .. IcName .. "accept" .. '" action="" method="POST">'
 					.. '<input type="hidden" name="accept" value="' .. IcName .. '"></input>'                              
-					.. '<input type="button" onclick="modify_rule(\'' .. IcName .. '\',\'accept\')" value="Accept"></input>'
+					.. '<input type="submit" value="Accept"></input>'
 					.. '</form>'                                                                                           
 					.. '<form style="margin:0px;display:inline" id="' .. IcName .. "reject" .. '" action="" method="POST">'
 					.. '<input type="hidden" name="reject" value="' .. IcName .. '"></input>'                              
-					.. '<input type="button" onclick="modify_rule(\'' .. IcName .. '\',\'reject\')" value="Reject"></input>'
+					.. '<input type="submit" value="Reject"></input>'
 					.. '</form>'                                                                                           
 					.. '<form style="margin:0px;display:inline" id="' .. IcName .. "delete" .. '" action="" method="POST">'
 					.. '<input type="hidden" name="delete" value="' .. IcName .. '"></input>'                              
-					.. '<input type="button" onclick="modify_rule(\'' .. IcName .. '\',\'delete\')" value="Delete"></input>'
+					.. '<input type="submit" value="Delete"></input>'
 					.. '</form></td>'                                                                                      
 					temp_table = temp_table .. "</tr>"
 				end
@@ -1407,15 +1407,15 @@ function general_temp_rule_table()
 				temp_table = temp_table .. "<td>"                                                                              
 				.. '<form style="margin:0px;display:inline" id="' .. IcName .. "accept" .. '" action="" method="POST">'
 				.. '<input type="hidden" name="accept" value="' .. IcName .. '"></input>'                              
-				.. '<input type="button" onclick="modify_rule(\'' .. IcName .. '\',\'accept\')" value="Accept"></input>'
+				.. '<input type="submit" value="Accept"></input>'
 				.. '</form>'                                                                                           
 				.. '<form style="margin:0px;display:inline" id="' .. IcName .. "reject" .. '" action="" method="POST">'
 				.. '<input type="hidden" name="reject" value="' .. IcName .. '"></input>'                              
-				.. '<input type="button" onclick="modify_rule(\'' .. IcName .. '\',\'reject\')" value="Reject"></input>'
+				.. '<input type="submit" value="Reject"></input>'
 				.. '</form>'                                                                                           
 				.. '<form style="margin:0px;display:inline" id="' .. IcName .. "delete" .. '" action="" method="POST">'
 				.. '<input type="hidden" name="delete" value="' .. IcName .. '"></input>'                              
-				.. '<input type="button" onclick="modify_rule(\'' .. IcName .. '\',\'delete\')" value="Delete"></input>'
+				.. '<input type="submit" value="Delete"></input>'
 				.. '</form></td>'                                                                                      
 				temp_table = temp_table .. "</tr>"
 			end
@@ -1477,16 +1477,20 @@ end
 function split_dash(str)
 	fields = {}
 	for text in string.gmatch(str, "[^-]+") do
+		log.print("field: " .. text)
 		table.insert(fields, text)
 	end
 	if #fields < 2 then
 		fields[2] = ""
 	end
+	log.print("returning fields: " .. fields[1] .. " " .. fields[2])
 	return fields[1], fields[2]
 end
 
 function delete_rule()
+	log.print("form value: " .. http.formvalue("delete"))
 	local delete_rule, device_idx = split_dash(http.formvalue("delete"))
+	log.print("device_idx after split: " .. device_idx)
 	local x=luci.model.uci.cursor()
 	if device_idx == "" then -- normal case
 		if(x:delete("dreamcatcher",delete_rule)) then
@@ -1501,6 +1505,7 @@ function delete_rule()
 				os.execute("/sbin/fw3 reload-dreamcatcher")
 			end
 		else -- we have a set of names -- remove the specified device index and commit
+			log.print("device_idx: " .. device_idx)
 			table.remove(device_names, device_idx)
 			if next(device_names) == nil then -- if table is now empty, just delete the whole rule
 				if(x:delete("dreamcatcher",delete_rule)) then
