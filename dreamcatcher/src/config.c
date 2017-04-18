@@ -322,7 +322,7 @@ int write_rule(rule* r) {
     rule_uci_set_int(ctx, r->hash, "dst_port", r->dst_port);
   }
   if (strncmp(r->device_name, "\0", DEVICE_NAME_SIZE) != 0) { // optional
-    rule_uci_set_str(ctx, r->hash, "device_name", r->device_name);
+    rule_uci_add_list_str(ctx, r->hash, "device_name", r->device_name);
   }
   rule_uci_set_str(ctx, r->hash, "verdict", get_verdict_string(r->target)); // required
   rule_uci_set_int(ctx, r->hash, "approved", 0); // required, always set to 0 because the user has not approved it yet
@@ -388,6 +388,14 @@ void rule_uci_set_str(struct uci_context *ctx, const char* hash, const char* opt
   snprintf(ptr_string, sizeof(ptr_string), "dreamcatcher.%s.%s=%s", hash, option, value);
   uci_lookup_ptr(ctx, &ptr, ptr_string, false);
   uci_set(ctx, &ptr);
+}
+
+void rule_uci_add_list_str(struct uci_context *ctx, const char* hash, const char* option, const char* value) {
+  struct uci_ptr ptr;
+  char ptr_string[128];
+  snprintf(ptr_string, sizeof(ptr_string), "dreamcatcher.%s.%s=%s", hash, option, value);
+  uci_lookup_ptr(ctx, &ptr, ptr_string, false);
+  uci_add_list(ctx, &ptr);
 }
 
 // reads from ptr the dns name using dns's weird encoding

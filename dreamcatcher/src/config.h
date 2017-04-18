@@ -88,6 +88,7 @@ int rule_exists(struct uci_context* ctx, const char* hash);
 void add_new_named_rule_section(struct uci_context* ctx, const char* hash);
 void rule_uci_set_int(struct uci_context* ctx, const char* hash, const char* option, const unsigned int value);
 void rule_uci_set_str(struct uci_context* ctx, const char* hash, const char* option, const char* value);
+void rule_uci_add_list_str(struct uci_context *ctx, const char* hash, const char* option, const char* value);
 
 unsigned int read_dns_name(unsigned char* payload, unsigned char* start, char* buf);
 unsigned char* skip_question(unsigned char* p);
