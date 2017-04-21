@@ -52,11 +52,11 @@ void handle_packet(struct nfq_data *tb, int index) {
     char vlan_s[5];
     
     FILE * fp;
-    while(fp = fopen((*j_obj)[index]["Filename"], "r")){
+    while(fp = fopen((j_obj)[index]["Filename"], "r")){
         fclose(fp);
         sleep(1);
     }
-    fp = fopen((*j_obj)[index]["Filename"], "w");
+    fp = fopen((j_obj)[index]["Filename"], "w");
     
     snprintf(vlan_s, 5, "%d", vlan);
     fputs(vlan_s, fp);
@@ -149,7 +149,7 @@ int main(int argc, char **argv)
 {
     static const char filename [] = "/tmp/test.txt";
     j_obj = json_object_from_file(filename);
-    int numThreads = json_object_array_length(json_object);
+    int numThreads = json_object_array_length(j_obj);
     
     //Dynamically allocate numThreads threads
     pthread_t * id_array;
@@ -158,7 +158,7 @@ int main(int argc, char **argv)
         
         pthread_t th1;
         int thisIndex = INDEX_NUM; 
-        INDEX_NUM += 1;
+        INDEX_NUM = INDEX_NUM + 1;
         pthread_create(&id_array[i], NULL, parentFunc, thisIndex);
         pthread_join(id_array[i], NULL);
         
