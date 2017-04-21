@@ -457,8 +457,9 @@ void alert_user(rule* r) {
 	char connection_addr[] = "192.168.1.129";
 	void* dst = malloc(sizeof(struct in_addr));
 	// set up socket
-	int sock;
-	if((sock = socket(AF_INET, SOCK_STREAM, 0) < 0)){
+	int sock = 0;
+	sock = socket(AF_INET, SOCK_STREAM, 0);
+	if (sock < 0) {
 		LOGE("ERROR OPENING SOCKET!!!");	
 	}
 	//int yes = 1;
@@ -480,7 +481,6 @@ void alert_user(rule* r) {
 	int message_size = strnlen(r->message, 128);
 	// connect to the phone
 	int made_connection = 0;
-	LOGV("BLARGH2: %u %u", addr.sin_port, addr.sin_addr.s_addr);
 	while(!made_connection){
 		if((connect(sock, (struct sockaddr*)&addr, sizeof(addr))) < 0){
 			LOGE("PHONE IS NOT ON THE NETWORK RIGHT NOW! %d", errno);
@@ -498,7 +498,7 @@ void alert_user(rule* r) {
 	memcpy(buffer, r->message, message_size+1);/*	= ("rule id:%s, message:%s",(rule_id, message));*/
 	int bytesSent = send(sock, &buffer, buffer_len, 0);
 	if(bytesSent != buffer_len){
-		LOGE(("THERE WAS AN ISSUE SENDING THE MESSAGE! THERE WERE %i bytes sent and there should have been %i bytes sent.", (bytesSent, buffer_len)));
+		LOGE("THERE WAS AN ISSUE SENDING THE MESSAGE! THERE WERE %d bytes sent and there should have been %d bytes sent.", bytesSent, buffer_len);
 	}
 	
 	// close the connection to the phone
