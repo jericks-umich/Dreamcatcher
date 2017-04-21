@@ -23,6 +23,7 @@
 #include <protocols.h>
 #include <config.h>
 #include <logger.h>
+#include <errno.h>
 
 #define TAG "MAIN"
 
@@ -453,43 +454,36 @@ void alert_user(rule* r) {
 	// same port as on which android will be listening
 	int connection_port = 6000;
 	// address of the phone on the network
-	char connection_addr[] = "insert address here";
+	char connection_addr[] = "192.168.1.129";
 	void* dst = malloc(sizeof(struct in_addr));
 	// set up socket
 	int sock;
-	if((sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP) < 0)){
+	if((sock = socket(AF_INET, SOCK_STREAM, 0) < 0)){
 		LOGE("ERROR OPENING SOCKET!!!");	
 	}
-	int yet = 1;
-	setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(yes));
+	//int yes = 1;
+	//if (0>setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(yes))) {
+	//	LOGE("ERROR SETTING SOCKET OPTIONS");
+	//}
 	struct sockaddr_in addr;
 	memset(&addr, 0, sizeof(addr));
 	addr.sin_family = AF_INET;
 	// set the port the app is listening on
 	addr.sin_port = htons(connection_port);
 	// set the address of the phone is listening on
-	if(inet_pton(AF_INET, connection_addr, dst)< 0){
+	if(inet_pton(AF_INET, connection_addr, dst)< 1){
 		LOGE("ERROR CONVERTING ADDRESS TO IN_ADDR");
 	}
-	addr.sin_addr = *dst;
+	memcpy((void*)&addr.sin_addr, dst, sizeof(addr.sin_addr));
 
-	// get rule id	
-        char rule_id[33];
-	memcpy(rule_id, r->hash, 33);
-
-	// craft message
-	char message[128];
-	memcpy(message, 0, 128);
-	memcpy(message, r->message, strlen(r->message));
-	
 	// get message size as C-str
-	int message_size = strlen(message);
+	int message_size = strnlen(r->message, 128);
 	// connect to the phone
 	int made_connection = 0;
-	int phone_connection;
-	while(!message_send){
-		if((phone_connection = connect(sock, (struct sockaddr *) addr, sizeof(addr))) < 0){
-			LOGE("PHONE IS NOT ON THE NETWORK RIGHT NOW!!");
+	LOGV("BLARGH2: %u %u", addr.sin_port, addr.sin_addr.s_addr);
+	while(!made_connection){
+		if((connect(sock, (struct sockaddr*)&addr, sizeof(addr))) < 0){
+			LOGE("PHONE IS NOT ON THE NETWORK RIGHT NOW! %d", errno);
 			sleep(60); // this will cause the thread to sleep for a minute
 		}
 		else{
@@ -498,17 +492,17 @@ void alert_user(rule* r) {
 	}
 	
 	//craft buffer and send message --> will this work?
-	char buffer[161];
-        memcpy(buffer, rule_id, 33);
-	memcpy(buffer, mesage, 128);/*	= ("rule id:%s, message:%s",(rule_id, message));*/
-	int buffer_len = strlen(buffer);
-	int bytesSent = send(phone_connection, &buffer, strlen(buffer), 0);
+	int buffer_len = 32+message_size+1;
+	char buffer[buffer_len];
+	memcpy(buffer, r->hash, 32);
+	memcpy(buffer, r->message, message_size+1);/*	= ("rule id:%s, message:%s",(rule_id, message));*/
+	int bytesSent = send(sock, &buffer, buffer_len, 0);
 	if(bytesSent != buffer_len){
 		LOGE(("THERE WAS AN ISSUE SENDING THE MESSAGE! THERE WERE %i bytes sent and there should have been %i bytes sent.", (bytesSent, buffer_len)));
 	}
 	
 	// close the connection to the phone
-	close(phone_connection);
+	close(sock);
 	
 }
 
