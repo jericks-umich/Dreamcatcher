@@ -1,7 +1,5 @@
-Index: linux-4.1.23/net/netfilter/xt_mdns.c
-===================================================================
 --- /dev/null
-+++ linux-4.1.23/net/netfilter/xt_mdns.c
++++ b/net/netfilter/xt_mdns.c
 @@ -0,0 +1,292 @@
 +#include <linux/string.h>
 +#include <linux/module.h>
@@ -51,7 +49,7 @@ Index: linux-4.1.23/net/netfilter/xt_mdns.c
 +  int i;
 +	char device_name_strip[XT_MDNS_MAX_NAME_SIZE];
 +	char* dot;
-+	pr_info("debug: device_name_approved called\n");
++	//pr_info("debug: device_name_approved called\n");
 +	//if (device_name[0] == '_') { // if the name starts with an underscore, it's a service, not a name -- approve it
 +	//	pr_info("debug: device name was approved because it starts with '_'\n");
 +	//	return true;
@@ -62,13 +60,13 @@ Index: linux-4.1.23/net/netfilter/xt_mdns.c
 +	if (dot != NULL) { // avoid writing to null pointer (if no '.' found, we can match the whole string -- although that should never happen)
 +		*dot = '\0'; // should effectively strip all trailing parts of the device name
 +	}
-+	pr_info("debug: stripped device_name \"%s\" -> \"%s\"\n", device_name, device_name_strip);
++	//pr_info("debug: stripped device_name \"%s\" -> \"%s\"\n", device_name, device_name_strip);
 +  for (i=0; i < XT_MDNS_MAX_NAMES; i++) {
 +    if ((*(info->names[i])) == '\0') { // if we don't have another name to check against
-+			pr_info("debug: out of names to check\n");
++			//pr_info("debug: out of names to check\n");
 +      return false; // then, since we haven't found a name match, we can't approve the name
 +    }
-+		pr_info("debug: checking first approved name: \"%s\"\n", info->names[i]);
++		//pr_info("debug: checking first approved name: \"%s\"\n", info->names[i]);
 +    if (strncmp(info->names[i], device_name_strip, XT_MDNS_MAX_NAME_SIZE) == 0) { // if our device name matches this approved name
 +      return true;
 +    }
@@ -95,13 +93,13 @@ Index: linux-4.1.23/net/netfilter/xt_mdns.c
 +	}
 +  // after questions come Answer Resource Requests, which we want to match
 +  // against the approved names in our info struct
-+	pr_info("debug: iterating over %u dns answers, %u authority answers, and %u additional answers\n", dns->answer_rr, dns->authority_rr, dns->additional_rr);
++	//pr_info("debug: iterating over %u dns answers, %u authority answers, and %u additional answers\n", dns->answer_rr, dns->authority_rr, dns->additional_rr);
 +  for (i=0; i < dns->answer_rr + dns->authority_rr + dns->additional_rr; i++) { // iterate over the answers
 +    name_length = read_dns_name(dns_raw, ptr, buf); // put name in buf
-+		pr_info("debug: read_dns_name() returns name of: %s\n", buf);
++		//pr_info("debug: read_dns_name() returns name of: %s\n", buf);
 +    ptr += name_length; // move ptr forward to type section
 +    type = ntohs(*(u_int16_t*)ptr); // translate from network byte order to host byte order
-+		pr_info("debug: type: %u\n", type);
++		//pr_info("debug: type: %u\n", type);
 +    ptr += 8; // move ptr past the TYPE (2 bytes), CLASS (2 bytes), and TTL (4 bytes) fields
 +    data_len = ntohs(*(u_int16_t*)ptr); // translate from network byte order to host byte order
 +    ptr += 2; // move ptr past the RDLENGTH field
@@ -115,21 +113,21 @@ Index: linux-4.1.23/net/netfilter/xt_mdns.c
 +        if (device_name_approved(info, buf) == false) { // check against the name we got above from the "Name" field
 +          return false;
 +        }
-+				pr_info("debug: device name of \"%s\" was approved (A/TXT/AAAA)\n", buf);
++				//pr_info("debug: device name of \"%s\" was approved (A/TXT/AAAA)\n", buf);
 +        break;
 +      case PTR :
 +#define SERVICES_STR "_services._dns-sd."
-+				pr_info("debug: \"%s\" =? \"%s\"\n", SERVICES_STR, buf);
++				//pr_info("debug: \"%s\" =? \"%s\"\n", SERVICES_STR, buf);
 +        if (strncmp(buf, SERVICES_STR, sizeof(SERVICES_STR)-1) == 0) { // if name matches services prefix, check for special case
-+					pr_info("debug: special services PTR record\n");
++					//pr_info("debug: special services PTR record\n");
 +          read_dns_name(dns_raw, ptr, buf);
-+					pr_info("debug: domain name: \"%s\"\n", buf);
++					//pr_info("debug: domain name: \"%s\"\n", buf);
 +          // check that first two segments of domain start with underscores, as the spec (https://tools.ietf.org/html/rfc6763#section-9) says they should
 +					dot = strchr(buf, '.'); // find first dot in domain name
 +					if (buf[0] == '_' && dot != NULL && dot[1] == '_') {
 +          //if (strncmp(strsep((char**)&temp_buf, "."), "_", 1) == 0 &&
 +          //    strncmp(strsep((char**)&temp_buf, "."), "_", 1) == 0) { // they do!
-+						pr_info("debug: skipping _services._dns-sd answer\n");
++						//pr_info("debug: skipping _services._dns-sd answer\n");
 +            break; // don't check this device name
 +          } else { // weird, name matches services prefix, but domain doesn't conform
 +            pr_info("Weird case. DNS name starts with _services._dns-sd., but domain doesn't start with underscores.\n");
@@ -140,27 +138,27 @@ Index: linux-4.1.23/net/netfilter/xt_mdns.c
 +          }
 +					break;
 +        }
-+				pr_info("debug: regular PTR record\n");
++				//pr_info("debug: regular PTR record\n");
 +        // if we get here, then this is a normal PTR record, not one starting with _services._dns-sd
 +        read_dns_name(dns_raw, ptr, buf);
 +        if (device_name_approved(info, buf) == false) { // check against the name we just got from the "Rdata" field
 +          return false;
 +        }
-+				pr_info("debug: device name of \"%s\" was approved (PTR)\n", buf);
++				//pr_info("debug: device name of \"%s\" was approved (PTR)\n", buf);
 +        break;
 +      case SRV :
 +        // check first device name from above
 +        if (device_name_approved(info, buf) == false) {
 +          return false;
 +        }
-+				pr_info("debug: device name of \"%s\" was approved (SRV1)\n", buf);
++				//pr_info("debug: device name of \"%s\" was approved (SRV1)\n", buf);
 +        // check second device name as target field
 +        read_dns_name(dns_raw, ptr+6, buf); // first 6 bytes are priority, weight, port
 +        // http://www.tahi.org/dns/packages/RFC2782_S4-1_0_0/SV/SV_RFC2782_SRV_rdata.html
 +        if (device_name_approved(info, buf) == false) {
 +          return false;
 +        }
-+				pr_info("debug: device name of \"%s\" was approved (SRV2)\n", buf);
++				//pr_info("debug: device name of \"%s\" was approved (SRV2)\n", buf);
 +        break;
 +      default :
 +        pr_warn("Unsupported DNS answer type: %u\n", type);
@@ -170,7 +168,7 @@ Index: linux-4.1.23/net/netfilter/xt_mdns.c
 +  }
 +
 +  // if we've parsed the packet and all names are approved, then we can approve this packet!
-+	pr_info("debug: Packet Approved!\n");
++	//pr_info("debug: Packet Approved!\n");
 +  return true;
 +}
 +
@@ -295,10 +293,8 @@ Index: linux-4.1.23/net/netfilter/xt_mdns.c
 +MODULE_DESCRIPTION("Xtables extension: Match mDNS discovery or advertisement packets with specific names");
 +MODULE_LICENSE("GPLv3");
 +
-Index: linux-4.1.23/net/netfilter/Makefile
-===================================================================
---- linux-4.1.23.orig/net/netfilter/Makefile
-+++ linux-4.1.23/net/netfilter/Makefile
+--- a/net/netfilter/Makefile
++++ b/net/netfilter/Makefile
 @@ -172,6 +172,7 @@ obj-$(CONFIG_NETFILTER_XT_MATCH_STATISTI
  obj-$(CONFIG_NETFILTER_XT_MATCH_STRING) += xt_string.o
  obj-$(CONFIG_NETFILTER_XT_MATCH_TCPMSS) += xt_tcpmss.o
@@ -307,11 +303,9 @@ Index: linux-4.1.23/net/netfilter/Makefile
  obj-$(CONFIG_NETFILTER_XT_MATCH_U32) += xt_u32.o
  
  # ipset
-Index: linux-4.1.23/net/netfilter/dns.h
-===================================================================
 --- /dev/null
-+++ linux-4.1.23/net/netfilter/dns.h
-@@ -0,0 +1,34 @@
++++ b/net/netfilter/dns.h
+@@ -0,0 +1,37 @@
 +#ifndef DNS_H
 +#define DNS_H
 +
@@ -342,14 +336,15 @@ Index: linux-4.1.23/net/netfilter/dns.h
 +  PTR = 12, 
 +  TXT = 16, 
 +  AAAA = 28, 
-+  SRV = 33
++  SRV = 33,
++	//NSEC = 47
 +} dns_type;
++// note: these are only some of the dns types. A full listing can be found here:
++// https://www.iana.org/assignments/dns-parameters/dns-parameters.xhtml#dns-parameters-4
 +
 +#endif // DNS_H
-Index: linux-4.1.23/net/netfilter/xt_mdns.h
-===================================================================
 --- /dev/null
-+++ linux-4.1.23/net/netfilter/xt_mdns.h
++++ b/net/netfilter/xt_mdns.h
 @@ -0,0 +1,28 @@
 +#ifndef _LINUX_NETFILTER_XT_MDNS_H
 +#define _LINUX_NETFILTER_XT_MDNS_H
@@ -379,10 +374,8 @@ Index: linux-4.1.23/net/netfilter/xt_mdns.h
 +unsigned char* skip_question(unsigned char* p);
 +
 +#endif // _LINUX_NETFILTER_XT_MDNS_H 
-Index: linux-4.1.23/net/netfilter/Kconfig
-===================================================================
---- linux-4.1.23.orig/net/netfilter/Kconfig
-+++ linux-4.1.23/net/netfilter/Kconfig
+--- a/net/netfilter/Kconfig
++++ b/net/netfilter/Kconfig
 @@ -1300,6 +1300,16 @@ config NETFILTER_XT_MATCH_PHYSDEV
  
  	  To compile it as a module, choose M here.  If unsure, say N.
