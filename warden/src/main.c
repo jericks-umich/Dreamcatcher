@@ -17,14 +17,16 @@
 #include <netinet/udp.h>
 #include <netinet/ip_icmp.h>
 #include <curl/curl.h>
-#include <json/json.h>
+#include <json-c/json.h>
 
 #include <main.h>
 #include <logger.h>
 
 #define TAG "MAIN"
 
-struct json_object *  j_obj;
+json_object* j_obj;
+int INDEX_NUM = 0;
+pthread_mutex_t lock;
 
 //From Dreamcatcher
 unsigned int get_src_vlan(struct nfq_data *tb) {
@@ -53,11 +55,13 @@ void handle_packet(struct nfq_data *tb, int index) {
     char vlan_s[5];
     
     FILE * fp;
-    while(fp = fopen((j_obj)[index]["Filename"], "r")){
+    struct json_object * filename_obj, *filename_array;
+    filename_array = json_object_object_get(filename_obj, "Filename");
+    while(fp = fopen((char *)(json_object_array_get_idx(filename_array, index)), "r")){
         fclose(fp);
         sleep(1);
     }
-    fp = fopen((j_obj)[index]["Filename"], "w");
+    fp = fopen((char*)(json_object_array_get_idx(filename_array, index)), "w");
     
     snprintf(vlan_s, 5, "%d", vlan);
     fputs(vlan_s, fp);
@@ -118,8 +122,10 @@ void * parentFunc(void *arg){
         LOGE("error during nfq_bind_pf()");
         exit(1);
     }
-    LOGV("binding this socket to queue '%d'", (u_int16_t)(*j_obj)[(int)arg]["Queue"]);
-    qh = nfq_create_queue(h, (u_int16_t)j_obj[(int)arg]["Queue"], &cb, NULL);
+    json_object * queue_obj, * queue_array;
+    queue_obj = json_object_object_get(j_obj, "Queue");
+    LOGV("binding this socket to queue '%d'", (u_int16_t)(json_object_array_get_idx(queue_obj, index)));
+    qh = nfq_create_queue(h, (u_int16_t)(json_object_array_get_idx(queue_obj, index)), &cb, NULL);
     if (!qh) {
         LOGE("error during nfq_create_queue()");
         exit(1);
@@ -159,7 +165,9 @@ int main(int argc, char **argv)
         
         pthread_t th1;
         int thisIndex = INDEX_NUM; 
+	pthread_mutex_lock(&lock);
         INDEX_NUM = INDEX_NUM + 1;
+	pthread_mutex_unlock(&lock);
         pthread_create(&id_array[i], NULL, parentFunc, thisIndex);
         pthread_join(id_array[i], NULL);
         

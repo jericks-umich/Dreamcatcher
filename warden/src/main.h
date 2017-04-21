@@ -12,7 +12,6 @@
 #include <netinet/udp.h>
 #include <netinet/ip_icmp.h>
 
-#define INDEX_NUM 0
 #define QUEUE_NUM 4671
 
 unsigned int get_src_vlan(struct nfq_data *tb);
