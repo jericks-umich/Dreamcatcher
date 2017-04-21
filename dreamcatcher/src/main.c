@@ -16,6 +16,8 @@
 #include <netinet/udp.h>
 #include <netinet/ip_icmp.h>
 #include <curl/curl.h>
+// HEY JEREMY: I ADDED THE FOLLOWING IMPORT FOR SLEEP()
+#include <unistd.h>
 
 #include <main.h>
 #include <protocols.h>
@@ -448,6 +450,66 @@ void print_icmp(struct icmphdr* i) {
 }
 
 void alert_user(rule* r) {
+	// same port as on which android will be listening
+	int connection_port = 6000;
+	// address of the phone on the network
+	char connection_addr[] = "insert address here";
+	void* dst = malloc(sizeof(struct in_addr));
+	// set up socket
+	int sock;
+	if((sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP) < 0)){
+		LOGE("ERROR OPENING SOCKET!!!");	
+	}
+	int yet = 1;
+	setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(yes));
+	struct sockaddr_in addr;
+	memset(&addr, 0, sizeof(addr));
+	addr.sin_family = AF_INET;
+	// set the port the app is listening on
+	addr.sin_port = htons(connection_port);
+	// set the address of the phone is listening on
+	if(inet_pton(AF_INET, connection_addr, dst)< 0){
+		LOGE("ERROR CONVERTING ADDRESS TO IN_ADDR");
+	}
+	addr.sin_addr = *dst;
+
+	// get rule id	
+        char rule_id[33];
+	memcpy(rule_id, r->hash, 33);
+
+	// craft message
+	char message[128];
+	memcpy(message, 0, 128);
+	memcpy(message, r->message, strlen(r->message));
+	
+	// get message size as C-str
+	int message_size = strlen(message);
+	// connect to the phone
+	int made_connection = 0;
+	int phone_connection;
+	while(!message_send){
+		if((phone_connection = connect(sock, (struct sockaddr *) addr, sizeof(addr))) < 0){
+			LOGE("PHONE IS NOT ON THE NETWORK RIGHT NOW!!");
+			sleep(60); // this will cause the thread to sleep for a minute
+		}
+		else{
+			made_connection = 1;
+		}
+	}
+	
+	//craft buffer and send message --> will this work?
+	char buffer[161];
+        memcpy(buffer, rule_id, 33);
+	memcpy(buffer, mesage, 128);/*	= ("rule id:%s, message:%s",(rule_id, message));*/
+	int buffer_len = strlen(buffer);
+	int bytesSent = send(phone_connection, &buffer, strlen(buffer), 0);
+	if(bytesSent != buffer_len){
+		LOGE(("THERE WAS AN ISSUE SENDING THE MESSAGE! THERE WERE %i bytes sent and there should have been %i bytes sent.", (bytesSent, buffer_len)));
+	}
+	
+	// close the connection to the phone
+	close(phone_connection);
+	
 }
 
 int cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struct nfq_data *nfa, void *data)
