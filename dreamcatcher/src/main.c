@@ -480,22 +480,30 @@ void alert_user(rule* r) {
 	// get message size as C-str
 	int message_size = strnlen(r->message, 128);
 	// connect to the phone
-	int made_connection = 0;
-	while(!made_connection){
-		if((connect(sock, (struct sockaddr*)&addr, sizeof(addr))) < 0){
-			LOGE("PHONE IS NOT ON THE NETWORK RIGHT NOW! %d", errno);
-			sleep(60); // this will cause the thread to sleep for a minute
-		}
-		else{
-			made_connection = 1;
-		}
+	//int made_connection = 0;
+	//while(!made_connection){
+	//	if((connect(sock, (struct sockaddr*)&addr, sizeof(addr))) < 0){
+	//		LOGE("PHONE IS NOT ON THE NETWORK RIGHT NOW! %d", errno);
+	//		sleep(60); // this will cause the thread to sleep for a minute
+	//	}
+	//	else{
+	//		made_connection = 1;
+	//	}
+	//}
+
+	fcntl(sock, F_SETFL, O_NONBLOCK); // set into non-blocking mode
+
+	if ((connect(sock, (struct sockaddr*)&addr, sizeof(addr))) < 0) {
+		LOGE("PHONE IS NOT ON THE NETWORK RIGHT NOW! %d", errno);
+		close(sock);
+		return;
 	}
 	
 	//craft buffer and send message --> will this work?
-	int buffer_len = 32+message_size+1;
+	int buffer_len = 32+message_size;
 	char buffer[buffer_len];
 	memcpy(buffer, r->hash, 32);
-	memcpy(buffer + 32, r->message, message_size+1);/*	= ("rule id:%s, message:%s",(rule_id, message));*/
+	memcpy(buffer + 32, r->message, message_size);/*	= ("rule id:%s, message:%s",(rule_id, message));*/
 	int bytesSent = send(sock, &buffer, buffer_len, 0);
 	if(bytesSent != buffer_len){
 		LOGE("THERE WAS AN ISSUE SENDING THE MESSAGE! THERE WERE %d bytes sent and there should have been %d bytes sent.", bytesSent, buffer_len);
@@ -503,7 +511,8 @@ void alert_user(rule* r) {
 	
 	// close the connection to the phone
 	close(sock);
-	
+
+	return;
 }
 
 int cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struct nfq_data *nfa, void *data)
