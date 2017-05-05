@@ -15,9 +15,8 @@
 #define QUEUE_NUM 4671
 
 unsigned int get_src_vlan(struct nfq_data *tb);
-void handle_packet(struct nfq_data *tb, int index);
+void handle_packet(struct nfq_data *tb);
 int cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struct nfq_data *nfa, void *data);
-void * parentFunc(void *arg);
 int main(int argc, char **argv);
 
 

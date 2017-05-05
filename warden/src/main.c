@@ -49,19 +49,17 @@ unsigned int get_src_vlan(struct nfq_data *tb) {
 }
 
 //VLAN Processing
-void handle_packet(struct nfq_data *tb, int index) {
+void handle_packet(struct nfq_data *tb) {
     
     unsigned int vlan = get_src_vlan(tb);
     char vlan_s[5];
     
     FILE * fp;
-    struct json_object * filename_obj, *filename_array;
-    filename_array = json_object_object_get(filename_obj, "Filename");
-    while(fp = fopen((char *)(json_object_array_get_idx(filename_array, index)), "r")){
+    while(fp = fopen("/var/run/warden.vlan", "r")){
         fclose(fp);
         sleep(1);
     }
-    fp = fopen((char*)(json_object_array_get_idx(filename_array, index)), "w");
+    fp = fopen("/var/run/warden.vlan", "w");
     
     snprintf(vlan_s, 5, "%d", vlan);
     fputs(vlan_s, fp);
@@ -79,23 +77,33 @@ int cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struct nfq_data *nfa, vo
     int ret;
     int id;
     u_int32_t verdict = NF_ACCEPT;
-    
-    struct nfqnl_msg_packet_hdr *ph = nfq_get_msg_packet_hdr(nfa);
+    LOGV("nfmsg->res_id: ");
+    LOGV(nfmsg->res_id);
+    LOGV("nfq get indev "); 
+    LOGV(nfq_get_indev(nfa));
+    LOGV("nfq get payload ");
+    char ** payload_data;
+    nfq_get_payload(nfa, payload_data);
+    LOGV(payload_data);
+    LOGV("nfa id: ");
+    struct nfqnl_msg_packet_hdr * ph = nfq_get_msg_packet_hdr(nfa);
+    LOGV(ph->packet_id);
+
+   // struct nfqnl_msg_packet_hdr *ph = nfq_get_msg_packet_hdr(nfa);
     if (ph) {
         id = ntohl(ph->packet_id);
     } else {
         LOGW("Cannot parse packet. Not sure what to do!");
     }
     
-    handle_packet(nfa, (int)data);
+    handle_packet(nfa);
     
     ret = nfq_set_verdict(qh, id, verdict, 0, NULL);
     return ret;
 }
 
 
-void * parentFunc(void *arg){
-
+int main(int argc, char ** argv){
     struct nfq_handle *h;
     struct nfq_q_handle *qh;
     struct nfnl_handle *nh;
@@ -122,10 +130,8 @@ void * parentFunc(void *arg){
         LOGE("error during nfq_bind_pf()");
         exit(1);
     }
-    json_object * queue_obj, * queue_array;
-    queue_obj = json_object_object_get(j_obj, "Queue");
-    LOGV("binding this socket to queue '%d'", (u_int16_t)(json_object_array_get_idx(queue_obj, index)));
-    qh = nfq_create_queue(h, (u_int16_t)(json_object_array_get_idx(queue_obj, index)), &cb, NULL);
+    LOGV("binding this socket to queue '%d'", QUEUE_NUM);
+    qh = nfq_create_queue(h, QUEUE_NUM, &cb, NULL);
     if (!qh) {
         LOGE("error during nfq_create_queue()");
         exit(1);
@@ -149,30 +155,5 @@ void * parentFunc(void *arg){
     LOGV("closing library handle");
     nfq_close(h);
 
-}
-
-
-int main(int argc, char **argv)
-{
-    static const char filename [] = "/tmp/test.txt";
-    j_obj = json_object_from_file(filename);
-    int numThreads = json_object_array_length(j_obj);
-    
-    //Dynamically allocate numThreads threads
-    pthread_t * id_array;
-    id_array = (pthread_t*)malloc(sizeof(pthread_t) * numThreads);
-    for (int i = 0; i < numThreads; ++i){
-        
-        pthread_t th1;
-        int thisIndex = INDEX_NUM; 
-	pthread_mutex_lock(&lock);
-        INDEX_NUM = INDEX_NUM + 1;
-	pthread_mutex_unlock(&lock);
-        pthread_create(&id_array[i], NULL, parentFunc, thisIndex);
-        pthread_join(id_array[i], NULL);
-        
-    }
-
-    
     exit(0);
 }
