@@ -1,0 +1,10 @@
+[
+  {
+    queue_num: "4671",
+    filename: "/var/run/warden.vlan"
+  },  
+  {
+    queue_num: "4672",
+    filename: "/var/run/warden.vlan2"
+  }
+]
