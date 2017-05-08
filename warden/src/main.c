@@ -17,7 +17,6 @@
 #include <netinet/udp.h>
 #include <netinet/ip_icmp.h>
 #include <curl/curl.h>
-#include <json/json.h>
 
 #include <main.h>
 #include <logger.h>
