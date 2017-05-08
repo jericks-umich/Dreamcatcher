@@ -19,12 +19,12 @@
 
 #define QUEUE_NUM 4670
 
-#define MAX_QUEUE_SIZE 10
+#define MAX_QUEUE_SIZE 100
 
 // a global array for holding rules
 rule rules[MAX_QUEUE_SIZE];
 // a counter for keeping track of the number of rules we currently have on the queue
-int numRules = 0;
+int rule_ctr;
 // a lock for editing the global variables above
 pthread_mutex_t lock;
 

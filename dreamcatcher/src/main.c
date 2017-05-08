@@ -330,16 +330,15 @@ int add_rule(struct nfq_data *tb, u_int32_t* verdict) {
     ret = write_rule(&new_rule);
   }
   if (ret == 0) { // if success
-    // pass the new rule to conductor
+    // pass the new rule to alert thread
     LOGD("SUCCESSFULLY ADDED RULE TO CONFIG FILE");
     pthread_mutex_lock(&lock);
-    if(numRules < MAX_QUEUE_SIZE){
+    if(rule_ctr < MAX_QUEUE_SIZE) {
     	LOGD("Adding rule to queue to be sent");
 	// copy the rule into the queue
-    	memcpy(rules + numRules, &new_rule, sizeof(struct rule));
-	++numRules;
-    }
-    else{
+    	memcpy(rules + rule_ctr, &new_rule, sizeof(struct rule));
+			++rule_ctr;
+    } else {
     	LOGD("Rule Queue is full");
     }
     pthread_mutex_unlock(&lock);
@@ -461,12 +460,14 @@ void print_icmp(struct icmphdr* i) {
 }
 
 void* alert_user(void* args) {
-	while(true){
-		if(rules[0]){
+	while(true) {
+		if(rule_ctr != 0) {
+#define CONNECTION_PORT 6000
+#define CONNECTION_ADDR "192.168.1.129"
 			// same port as on which android will be listening
-			int connection_port = 6000;
+			int connection_port = CONNECTION_PORT;
 			// address of the phone on the network
-			char connection_addr[] = "192.168.1.129";
+			char connection_addr[] = CONNECTION_ADDR;
 			void* dst = malloc(sizeof(struct in_addr));
 			// set up socket
 			int sock = 0;
@@ -505,11 +506,11 @@ void* alert_user(void* args) {
 			// optimize for speed by having it not unlock and lock in the loop,
 			// however, this would favor alerting the user over adding rules to
 			// config file
-			while(rules[0]){
-				// lock here
-				pthread_mutex_lock(&lock);
-				--numRules;
-				rule* r = &rules[numRules];
+			// lock here
+			pthread_mutex_lock(&lock);
+			while(rule_ctr > 0){
+				--rule_ctr;
+				rule* r = &rules[rule_ctr];
 				// get message size as C-str
 				int message_size = strnlen(r->message, 128);
 	
@@ -523,20 +524,18 @@ void* alert_user(void* args) {
 					LOGE("THERE WAS AN ISSUE SENDING THE MESSAGE! THERE WERE %d bytes sent and there should have been %d bytes sent.", bytesSent, buffer_len);
 				}
 				// zero out the rule that was just sent
-				memcpy(rules + numRules, 0, sizeof(struct rule));
+				memset(rules + rule_ctr, 0, sizeof(struct rule));
 				// unlock here
-				pthread_mutex_unlock(&lock);
 			}
+			pthread_mutex_unlock(&lock);
 						
 			// close the connection to the phone
 			close(sock);
 
-		}
-		else{
+		} else {
 			LOGD("No rules to send, sleeping for 60 seconds");
 			sleep(60);
 		}
-		
 	}
 }
 
@@ -580,6 +579,7 @@ int main(int argc, char **argv)
 	int rv;
   int ret;
 	char buf[4096] __attribute__ ((aligned));
+	rule_ctr = 0;
 	// make sure the queue is zeroed out
 	memset(rules, 0, sizeof(rules));
 	//initialize the lock
