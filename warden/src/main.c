@@ -17,10 +17,7 @@
 #include <netinet/udp.h>
 #include <netinet/ip_icmp.h>
 #include <curl/curl.h>
-<<<<<<< HEAD
-=======
 #include <json-c/json.h>
->>>>>>> d2b15c31013d5585fd28f8b640c7bebabb77dd49
 
 #include <main.h>
 #include <logger.h>
@@ -28,8 +25,6 @@
 #define TAG "MAIN"
 
 json_object* j_obj;
-int INDEX_NUM = 0;
-pthread_mutex_t lock;
 
 //From Dreamcatcher
 unsigned int get_src_vlan(struct nfq_data *tb) {
@@ -52,17 +47,17 @@ unsigned int get_src_vlan(struct nfq_data *tb) {
 }
 
 //VLAN Processing
-void handle_packet(struct nfq_data *tb) {
+void handle_packet(struct nfq_data *tb, char * filename) {
     
     unsigned int vlan = get_src_vlan(tb);
     char vlan_s[5];
     
     FILE * fp;
-    while(fp = fopen("/var/run/warden.vlan", "r")){
+    while(fp = fopen(filename, "r")){
         fclose(fp);
         sleep(1);
     }
-    fp = fopen("/var/run/warden.vlan", "w");
+    fp = fopen(filename, "w");
     
     snprintf(vlan_s, 5, "%d", vlan);
     fputs(vlan_s, fp);
@@ -80,33 +75,46 @@ int cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struct nfq_data *nfa, vo
     int ret;
     int id;
     u_int32_t verdict = NF_ACCEPT;
-    LOGV("nfmsg->res_id: ");
-    LOGV(nfmsg->res_id);
-    LOGV("nfq get indev "); 
-    LOGV(nfq_get_indev(nfa));
-    LOGV("nfq get payload ");
-    char ** payload_data;
-    nfq_get_payload(nfa, payload_data);
-    LOGV(payload_data);
-    LOGV("nfa id: ");
-    struct nfqnl_msg_packet_hdr * ph = nfq_get_msg_packet_hdr(nfa);
-    LOGV(ph->packet_id);
 
-   // struct nfqnl_msg_packet_hdr *ph = nfq_get_msg_packet_hdr(nfa);
+    int queue_num = nfq_get_nfmark(nfa);
+
+    struct json_object * j_obj_array;
+    j_obj_array = json_object_get_array(j_obj);
+    int array_len = json_object_array_length(j_obj_array);
+
+    //Iterate over json objects until matching queue number is found
+    bool found = false;
+    char * filename;
+    for(int i = 0; i < array_len; ++i) {
+        struct json_object * entry = json_object_array_get_index(j_obj_array, i);
+        int current_queue = json_object_object_get(entry, "queue_num");
+        if(current_queue == queue_num){
+            filename = json_object_object_get(entry, "filename");
+            found = true;
+            break;
+        }
+    }
+
+    if(!found){
+        LOGW("Invalid queue number in packet");
+    }
+    
+    struct nfqnl_msg_packet_hdr *ph = nfq_get_msg_packet_hdr(nfa);
     if (ph) {
         id = ntohl(ph->packet_id);
     } else {
         LOGW("Cannot parse packet. Not sure what to do!");
     }
     
-    handle_packet(nfa);
+    handle_packet(nfa, filename);
     
     ret = nfq_set_verdict(qh, id, verdict, 0, NULL);
     return ret;
 }
 
 
-int main(int argc, char ** argv){
+void * parentFunc(void *arg){
+
     struct nfq_handle *h;
     struct nfq_q_handle *qh;
     struct nfnl_handle *nh;
@@ -114,6 +122,7 @@ int main(int argc, char ** argv){
     int rv;
     int ret;
     char buf[4096] __attribute__ ((aligned));
+    int queue_num = (int)arg;
     
     
     // create handle to nfqueue and watch for new packets to handle
@@ -133,8 +142,8 @@ int main(int argc, char ** argv){
         LOGE("error during nfq_bind_pf()");
         exit(1);
     }
-    LOGV("binding this socket to queue '%d'", QUEUE_NUM);
-    qh = nfq_create_queue(h, QUEUE_NUM, &cb, NULL);
+    LOGV("binding this socket to queue '%d'", queue_num);
+    qh = nfq_create_queue(h, queue_num, &cb, NULL);
     if (!qh) {
         LOGE("error during nfq_create_queue()");
         exit(1);
@@ -153,10 +162,29 @@ int main(int argc, char ** argv){
     }
     
     LOGD("Quitting because we received %d: %s", rv, strerror(errno));
-    LOGV("unbinding from queue %d", QUEUE_NUM);
+    LOGV("unbinding from queue %d", queue_num);
     nfq_destroy_queue(qh);
     LOGV("closing library handle");
     nfq_close(h);
+
+}
+
+
+int main(int argc, char **argv)
+{
+    static const char filename [] = "test.txt";
+    j_obj = json_object_from_file(filename);
+    int numThreads = json_object_array_length(j_obj);
+
+    for(int i = 0; i < numThreads; ++i) {
+        struct json_object * entry = json_object_array_get_index(j_obj_array, i);
+        int current_queue = json_object_object_get(entry, "queue_num");
+
+        pthread_t th;
+        pthread_create(&th, NULL, parentFunc, current_queue);
+        pthread_join(th, NULL);
+
+    }
 
     exit(0);
 }
