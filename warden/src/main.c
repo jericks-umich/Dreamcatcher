@@ -25,7 +25,9 @@
 
 #define TAG "MAIN"
 
-json_object* j_obj;
+int NUM_QUEUES;
+int QUEUES[100];
+const char * FILENAMES[100];
 
 //From Dreamcatcher
 unsigned int get_src_vlan(struct nfq_data *tb) {
@@ -78,29 +80,22 @@ int cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struct nfq_data *nfa, vo
 	u_int32_t verdict = NF_ACCEPT;
 
 	int queue_num = nfq_get_nfmark(nfa);
-
-	struct json_object * j_obj_array;
-	j_obj_array = json_object_get_array(j_obj);
-	int array_len = json_object_array_length(j_obj_array);
-
-	//Iterate over json objects until matching queue number is found
-	bool found = false;
-	char * filename;
-	for(int i = 0; i < array_len; ++i) {
-		struct json_object* entry = json_object_array_get_idx(j_obj_array, i);
-		int current_queue = json_object_object_get(entry, "queue_num");
-		if(current_queue == queue_num){
-			filename = json_object_object_get(entry, "filename");
-			found = true;
+        char * filename;
+	
+	int index = -1;
+	for (int i = 0; i < NUM_QUEUES; ++i){
+		if(QUEUES[i] == queue_num){
+			index = i;
 			break;
 		}
 	}
-
-	if(!found){
-		LOGW("Invalid queue number in packet");
+	if (index == -1){
+		LOGW("Invalid queue num");
 	}
+	filename = FILENAMES[index];
+	LOGV(filename);
 
-	struct nfqnl_msg_packet_hdr *ph = nfq_get_msg_packet_hdr(nfa);
+	struct nfqnl_msg_packet_hdr * ph = nfq_get_msg_packet_hdr(nfa);
 	if (ph) {
 		id = ntohl(ph->packet_id);
 	} else {
@@ -124,6 +119,7 @@ void * parentFunc(void *arg){
 	int ret;
 	char buf[4096] __attribute__ ((aligned));
 	int queue_num = (int)arg;
+	LOGV("Queue Num in Parent Func %d", queue_num);
 
 
 	// create handle to nfqueue and watch for new packets to handle
@@ -173,34 +169,43 @@ void * parentFunc(void *arg){
 
 int main(int argc, char **argv)
 {
-	LOGV("1");
 	static const char filename [] = "test.txt";
-	LOGV("2");
-	j_obj = json_object_from_file(filename);
-	LOGV("3");
-	LOGV("j_obj: %x", j_obj);
-	struct json_object * j_obj_array;
-	LOGV("4");
-	//LOGV("type: %d", j_obj->o_type);
-	j_obj_array = json_object_get_array(j_obj);
-	LOGV("5");
-	//LOGV("type: %d", j_obj_array->o_type);
-	int numThreads = json_object_array_length(j_obj_array);
-	LOGV("6");
+	FILE * fp;
+	fp = fopen("test.txt", "r");
+	char line[256];
 
-	for(int i = 0; i < numThreads; ++i) {
-		struct json_object * entry = json_object_array_get_idx(j_obj_array, i);
-		void* current_queue = json_object_object_get(entry, "queue_num");
-		LOGV("7");
+	//Get num_queues
+	fgets(line, sizeof(line), fp);
+	LOGV(line);
+	char * num_queues_string = strtok(line, " ");
+	num_queues_string = strtok(NULL, " ");
+	NUM_QUEUES = (int)num_queues_string;
 
-		pthread_t th;
-		LOGV("8");
-		pthread_create(&th, NULL, parentFunc, current_queue);
-		LOGV("9");
-		pthread_join(th, NULL);
-		LOGV("10");
 
+	int index = 0;
+	while(fgets(line, sizeof(line), fp)){
+		char * read_string = strtok(line, " " );
+
+		if(!strcmp(read_string, "queue_num:")){
+			read_string = strtok(NULL, " " );
+			LOGV(read_string);
+			QUEUES[index] = atoi(read_string);
+		}
+
+		else if(!strcmp(read_string, "filename:")){
+			read_string = strtok(NULL, " ");
+			FILENAMES[index] = read_string;
+			++index;
+		}
 	}
+
+	//Threads aren't created until after array initialization to avoid race conditions
+	for(int i = 0; i < NUM_QUEUES; ++i){
+		pthread_t th;
+		pthread_create(&th, NULL, parentFunc, QUEUES[i]);
+		pthread_join(th, NULL);
+	}
+	fclose(fp);
 
 	exit(0);
 }
