@@ -85,6 +85,7 @@ int cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struct nfq_data *nfa, vo
 	int index = -1;
 	for (int i = 0; i < NUM_QUEUES; ++i){
 		if(QUEUES[i] == queue_num){
+			LOGV ("matching file found at index %d", i);
 			index = i;
 			break;
 		}
@@ -93,7 +94,6 @@ int cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struct nfq_data *nfa, vo
 		LOGW("Invalid queue num");
 	}
 	filename = FILENAMES[index];
-	LOGV(filename);
 
 	struct nfqnl_msg_packet_hdr * ph = nfq_get_msg_packet_hdr(nfa);
 	if (ph) {
@@ -119,8 +119,6 @@ void * parentFunc(void *arg){
 	int ret;
 	char buf[4096] __attribute__ ((aligned));
 	int queue_num = (int)arg;
-	LOGV("Queue Num in Parent Func %d", queue_num);
-
 
 	// create handle to nfqueue and watch for new packets to handle
 	LOGV("opening library handle");
@@ -176,36 +174,53 @@ int main(int argc, char **argv)
 
 	//Get num_queues
 	fgets(line, sizeof(line), fp);
-	LOGV(line);
 	char * num_queues_string = strtok(line, " ");
 	num_queues_string = strtok(NULL, " ");
 	NUM_QUEUES = (int)num_queues_string;
 
 
 	int index = 0;
-	while(fgets(line, sizeof(line), fp)){
+	while(fgets(line, sizeof(line), fp)){ 
+		
 		char * read_string = strtok(line, " " );
+		char * to_store = "";
 
 		if(!strcmp(read_string, "queue_num:")){
 			read_string = strtok(NULL, " " );
-			LOGV(read_string);
 			QUEUES[index] = atoi(read_string);
 		}
 
 		else if(!strcmp(read_string, "filename:")){
 			read_string = strtok(NULL, " ");
-			FILENAMES[index] = read_string;
+			//Needed to remove garbage characters at end
+			read_string[strlen(read_string)-1] = '\0';
+			FILENAMES[index] = (char*) malloc(100);
+			strcpy(FILENAMES[index], read_string);
 			++index;
 		}
 	}
 
 	//Threads aren't created until after array initialization to avoid race conditions
 	for(int i = 0; i < NUM_QUEUES; ++i){
+		//pthread_t *th = malloc(sizeof(*th));
+		//thread_arr[i] = th;
+		//pthread_create(thread_arr[i], NULL, parentFunc, QUEUES[i]);
 		pthread_t th;
 		pthread_create(&th, NULL, parentFunc, QUEUES[i]);
 		pthread_join(th, NULL);
 	}
+	
+	//for (int i = 0; i < NUM_QUEUES; ++i){
+	//	pthread_join(thread_arr[i], NULL);
+//	}
+
 	fclose(fp);
+	
+	//Free dynamically allocated memory
+	//free(thread_arr);
+	for (int i = 0; i < NUM_QUEUES; ++i){
+		free(FILENAMES[i]);
+	}
 
 	exit(0);
 }
