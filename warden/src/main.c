@@ -26,8 +26,9 @@
 #define TAG "MAIN"
 
 int NUM_QUEUES;
-int QUEUES[100];
-const char * FILENAMES[100];
+int QUEUES[MAX_QUEUES];
+const char * FILENAMES[MAX_QUEUES];
+pthread_t thread_arr[MAX_QUEUES];
 
 //From Dreamcatcher
 unsigned int get_src_vlan(struct nfq_data *tb) {
@@ -52,19 +53,25 @@ unsigned int get_src_vlan(struct nfq_data *tb) {
 //VLAN Processing
 void handle_packet(struct nfq_data *tb, char * filename) {
 
+	//Grab source vlan to store in file
 	unsigned int vlan = get_src_vlan(tb);
 	char vlan_s[5];
 
+	//Busy wait while file exists
 	FILE * fp;
 	while(fp = fopen(filename, "r")){
 		fclose(fp);
 		sleep(1);
 	}
+	
+	//Once file has been deleted, re-create it
 	fp = fopen(filename, "w");
 
+	//Store source vlan in new file
 	snprintf(vlan_s, 5, "%d", vlan);
 	fputs(vlan_s, fp);
 
+	//Close file
 	fclose(fp);
 
 	return;
@@ -77,22 +84,26 @@ int cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struct nfq_data *nfa, vo
 	LOGV("Got callback!");
 	int ret;
 	int id;
-	u_int32_t verdict = NF_ACCEPT;
+	u_int32_t verdict = NF_ACCEPT;	
+	char * filename;
 
+	//Get queue_num from mark
 	int queue_num = nfq_get_nfmark(nfa);
-        char * filename;
 	
+	//Search through QUEUES array to find index
 	int index = -1;
 	for (int i = 0; i < NUM_QUEUES; ++i){
 		if(QUEUES[i] == queue_num){
-			LOGV ("matching file found at index %d", i);
 			index = i;
 			break;
 		}
 	}
+	//Make sure matching entry was found
 	if (index == -1){
 		LOGW("Invalid queue num");
 	}
+
+	//Use index to find associated filename
 	filename = FILENAMES[index];
 
 	struct nfqnl_msg_packet_hdr * ph = nfq_get_msg_packet_hdr(nfa);
@@ -149,7 +160,6 @@ void * parentFunc(void *arg){
 		exit(1);
 	}
 	fd = nfq_fd(h);
-
 	while ((rv = recv(fd, buf, sizeof(buf), 0)) && rv >= 0) {
 		LOGV("pkt received");
 		ret = nfq_handle_packet(h, buf, rv);
@@ -167,57 +177,64 @@ void * parentFunc(void *arg){
 
 int main(int argc, char **argv)
 {
+	//Read from initialization file
 	static const char filename [] = "test.txt";
 	FILE * fp;
 	fp = fopen("test.txt", "r");
 	char line[256];
 
-	//Get num_queues
+	//Get NUM_QUEUES
 	fgets(line, sizeof(line), fp);
 	char * num_queues_string = strtok(line, " ");
 	num_queues_string = strtok(NULL, " ");
-	NUM_QUEUES = (int)num_queues_string;
+	NUM_QUEUES = atoi(num_queues_string);
 
-
+	//Read queue + filename pairs from file
 	int index = 0;
 	while(fgets(line, sizeof(line), fp)){ 
 		
 		char * read_string = strtok(line, " " );
 		char * to_store = "";
 
+		//Handle queue_num
 		if(!strcmp(read_string, "queue_num:")){
 			read_string = strtok(NULL, " " );
 			QUEUES[index] = atoi(read_string);
 		}
 
+		//Handle filename
 		else if(!strcmp(read_string, "filename:")){
+
 			read_string = strtok(NULL, " ");
+
 			//Needed to remove garbage characters at end
 			read_string[strlen(read_string)-1] = '\0';
+
 			FILENAMES[index] = (char*) malloc(100);
 			strcpy(FILENAMES[index], read_string);
+
+			//queue_num + filename pair done
 			++index;
 		}
 	}
 
-	//Threads aren't created until after array initialization to avoid race conditions
-	for(int i = 0; i < NUM_QUEUES; ++i){
-		//pthread_t *th = malloc(sizeof(*th));
-		//thread_arr[i] = th;
-		//pthread_create(thread_arr[i], NULL, parentFunc, QUEUES[i]);
+	//Threads aren't created until after array initialization 
+	//to avoid race conditions
+	for(int i = 0; i < NUM_QUEUES; ++i){ 
 		pthread_t th;
-		pthread_create(&th, NULL, parentFunc, QUEUES[i]);
-		pthread_join(th, NULL);
+		thread_arr[i] = th;
+		pthread_create(&thread_arr[i], NULL, parentFunc, QUEUES[i]);
 	}
-	
-	//for (int i = 0; i < NUM_QUEUES; ++i){
-	//	pthread_join(thread_arr[i], NULL);
-//	}
 
+	//Join child threads to parent thread
+	for (int i = 0; i < NUM_QUEUES; ++i){
+		pthread_join(thread_arr[i], NULL);
+	}
+
+	//Close file
 	fclose(fp);
 	
 	//Free dynamically allocated memory
-	//free(thread_arr);
 	for (int i = 0; i < NUM_QUEUES; ++i){
 		free(FILENAMES[i]);
 	}

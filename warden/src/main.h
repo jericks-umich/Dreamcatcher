@@ -12,7 +12,7 @@
 #include <netinet/udp.h>
 #include <netinet/ip_icmp.h>
 
-#define QUEUE_NUM 4671
+#define MAX_QUEUES 100
 
 unsigned int get_src_vlan(struct nfq_data *tb);
 void handle_packet(struct nfq_data *tb, char* filename);
