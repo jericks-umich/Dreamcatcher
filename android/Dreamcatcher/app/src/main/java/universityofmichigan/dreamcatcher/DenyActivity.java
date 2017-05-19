@@ -173,7 +173,11 @@ public class DenyActivity extends AppCompatActivity {
          * TODO: Parse out and update the cookie
          */
         // *****************************************************
-
+        try {
+            Thread.sleep(500);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
         // retrieve the identifier passed into the Intent
         Intent intent = getIntent();
         final String id = intent.getStringExtra("id");
@@ -218,7 +222,7 @@ public class DenyActivity extends AppCompatActivity {
                 headers.put("Accept", "application/json");
                 headers.put("Accept-Language", "en-US,en;q=0.5");
                 headers.put("Referer", "https://192.168.1.1/cgi-bin/luci/");
-                headers.put("Cookie", ((GlobalClass) getApplicationContext()).getCookie());
+                headers.put("Cookie", "sysauth="+((GlobalClass) getApplicationContext()).getCookie());
                 headers.put("Upgrade-Insecure-Requests", "1");
                 headers.put("Connection", "keep-alive");
                 headers.put("Content-Type", "application/x-www-form-urlencoded");
