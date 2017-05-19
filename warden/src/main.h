@@ -15,7 +15,7 @@
 #define MAX_QUEUES 100
 
 unsigned int get_src_vlan(struct nfq_data *tb);
-void handle_packet(struct nfq_data *tb, char* filename);
+void handle_packet(struct nfq_data *tb, char* filename, int index);
 int cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struct nfq_data *nfa, void *data);
 int main(int argc, char **argv);
 

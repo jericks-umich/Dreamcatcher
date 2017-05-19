@@ -29,6 +29,7 @@ int NUM_QUEUES;
 int QUEUES[MAX_QUEUES];
 const char * FILENAMES[MAX_QUEUES];
 pthread_t thread_arr[MAX_QUEUES];
+unsigned int last_vlan[MAX_QUEUES] = {0};
 
 //From Dreamcatcher
 unsigned int get_src_vlan(struct nfq_data *tb) {
@@ -51,30 +52,76 @@ unsigned int get_src_vlan(struct nfq_data *tb) {
 }
 
 //VLAN Processing
-void handle_packet(struct nfq_data *tb, char * filename) {
+void handle_packet(struct nfq_data *tb, char * filename, int index) {
 
 	//Grab source vlan to store in file
 	unsigned int vlan = get_src_vlan(tb);
 	char vlan_s[5];
-
-	//Busy wait while file exists
-	FILE * fp;
-	while(fp = fopen(filename, "r")){
-		fclose(fp);
-		sleep(1);
-	}
 	
-	//Once file has been deleted, re-create it
-	fp = fopen(filename, "w");
+	FILE * fp;
 
-	//Store source vlan in new file
-	snprintf(vlan_s, 5, "%d", vlan);
-	fputs(vlan_s, fp);
+	//If file exists
+	if(fp = fopen(filename, "r")){
+		fclose(fp);
 
-	//Close file
-	fclose(fp);
+		//If vlan matches, let packet through
+		if(vlan == last_vlan[index]){
+			return;
+		}
 
-	return;
+		//If vlan doesn't match, wait and create new file
+		else{
+			//Busy wait while file exists
+			int timer = 0;
+			while(fp = fopen(filename, "r")){
+			//if(fp = fopen(filename, "r")){
+				fclose(fp);
+				sleep(1);
+				timer = timer + 1;
+				if (timer > 3){
+					remove(filename);
+					break;
+				}
+			}
+
+			//Once file has been deleted, recreate it
+			sleep(1);
+			fp = fopen(filename, "w");
+
+			//Store source vlan in new file
+			snprintf(vlan_s, 5, "%d", vlan);
+			fputs(vlan_s, fp);
+
+			//Close file
+			fclose(fp);
+
+			last_vlan[index] = vlan;
+			return;
+		}
+	}
+	//If file doesn't exist
+	else{
+		//If vlan doesn't match, sleep a second
+		if(vlan != last_vlan[index]){
+			sleep(1);
+		}
+
+		//Create file
+		fp = fopen(filename, "w");
+
+		//Store source vlan in a new file
+		snprintf(vlan_s, 5, "%d", vlan);
+		fputs(vlan_s, fp);
+
+		//Close file
+		fclose(fp);
+
+		last_vlan[index] = vlan;
+		return;
+
+	}
+
+
 }
 
 
@@ -113,7 +160,7 @@ int cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struct nfq_data *nfa, vo
 		LOGW("Cannot parse packet. Not sure what to do!");
 	}
 
-	handle_packet(nfa, filename);
+	handle_packet(nfa, filename, index);
 
 	ret = nfq_set_verdict(qh, id, verdict, 0, NULL);
 	return ret;
