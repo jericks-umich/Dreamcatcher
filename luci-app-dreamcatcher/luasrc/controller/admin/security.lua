@@ -1699,6 +1699,9 @@ function add_devices()
 end
 
 function GetDeviceName(vlan)                                                                                                           
+	if vlan == nil then
+		return "Unknown device"
+	end
 	local dname = ""                                                                                                               
 	local vlan_line = 'Tunnel-Private-Group-ID = "' .. vlan  .. '"'                                                        
 	local file = io.open("/etc/freeradius2/users","r")                                                                             
