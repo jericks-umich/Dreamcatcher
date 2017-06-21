@@ -13,6 +13,7 @@ CONFIG_DIR=$THIS_DIR/config
 PATCH_DIR=$THIS_DIR/patches
 DREAMCATCHER_DIR=$THIS_DIR/dreamcatcher
 WARDEN_DIR=$THIS_DIR/warden
+SNIFFER_DIR=$THIS_DIR/sniffer
 LUCI_APP_DREAMCATCHER_DIR=$THIS_DIR/luci-app-dreamcatcher
 DEPS="git-core build-essential libssl-dev libncurses5-dev unzip gawk subversion quilt zlib1g-dev"
 XTABLES_DEPS="pkg-config libxtables-dev libxtables12 xtables-addons-common xtables-addons-dkms xtables-addons-source"
@@ -105,6 +106,10 @@ ln -s $DREAMCATCHER_DIR $OPENWRT_DIR/package/network/utils/dreamcatcher
 # add warden package
 rm $OPENWRT_DIR/package/network/utils/warden 2>/dev/null
 ln -s $WARDEN_DIR $OPENWRT_DIR/package/network/utils/warden
+
+# add sniffer package
+rm $OPENWRT_DIR/package/network/utils/sniffer 2>/dev/null
+ln -s $SNIFFER_DIR $OPENWRT_DIR/package/network/utils/sniffer
 
 # build feed indices (this was stolen and modified from scripts/feeds)
 pushd $OPENWRT_DIR/
