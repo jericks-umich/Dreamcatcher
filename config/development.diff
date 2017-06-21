@@ -12,6 +12,7 @@ CONFIG_OPENSSL_WITH_EC=y
 CONFIG_PACKAGE_curl=y
 CONFIG_PACKAGE_dreamcatcher=y
 CONFIG_PACKAGE_ebtables=y
+CONFIG_PACKAGE_sniffer=y
 CONFIG_PACKAGE_freeradius2=y
 CONFIG_PACKAGE_freeradius2-common=y
 CONFIG_PACKAGE_freeradius2-mod-chap=y
