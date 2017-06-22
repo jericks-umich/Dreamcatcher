@@ -22,6 +22,9 @@ define Package/bridge/description
 	Sniffer tool for machine-learning and network defense
 endef
 
+define Build/Compile
+endef
+
 define Package/sniffer/install
 	$(INSTALL_DIR) $(1)/usr/sbin
 	$(INSTALL_BIN) ./src/sniffer.py $(1)/usr/sbin/sniffer.py
